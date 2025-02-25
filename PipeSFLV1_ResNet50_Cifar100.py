@@ -636,8 +636,8 @@ if __name__ == '__main__':
             normalize,
             ])
 
-    train_directory = os.path.join('/data/cifar-100-python', 'train1')
-    valid_directory = os.path.join('/data/cifar-100-python', 'val')
+    train_directory = os.path.join('./data/cifar-100-python', 'train1')
+    valid_directory = os.path.join('./data/cifar-100-python', 'val')
     dataset_train = datasets.ImageFolder(root=train_directory, transform=train_transform)
     dataset_test = datasets.ImageFolder(root=valid_directory, transform=test_transform)
 

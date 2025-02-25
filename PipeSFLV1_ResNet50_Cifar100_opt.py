@@ -131,7 +131,18 @@ class ResNet50_server_side(nn.Module):
 #                                  Server Side Programs
 #====================================================================================================
 # Federated averaging: FedAvg
+# def FedAvg(w):
+#     w_avg = copy.deepcopy(w[0])
+#     for k in w_avg.keys():
+#         for i in range(1, len(w)):
+#             w_avg[k] += w[i][k]
+#         w_avg[k] = torch.div(w_avg[k], len(w))
+#     return w_avg
+
 def FedAvg(w):
+    if isinstance(w[0], dict) and next(iter(w[0])).startswith('module.'):
+        # 如果键名有 module. 前缀，去掉前缀
+        w = [{k.replace('module.', ''): v for k, v in state_dict.items()} for state_dict in w]
     w_avg = copy.deepcopy(w[0])
     for k in w_avg.keys():
         for i in range(1, len(w)):
@@ -369,10 +380,10 @@ class Client(object):
             len_batch = len(self.ldr_train)
             for batch_idx, (images, labels) in enumerate(self.ldr_train):
                 FF_start_time = time.time()
-                images, labels = images.to(torch.device("cuda:" + str(self.idx))), labels.to(torch.device("cuda:0"))
+                images, labels = images.to(torch.device("cuda:0")), labels.to(torch.device("cuda:0"))
 
                 optimizer_client.zero_grad()
-                #---------forward prop-------------
+                # ---------forward prop-------------
                 fx = net(images)
                 client_fx = fx.clone().detach()
 
@@ -388,78 +399,80 @@ class Client(object):
                     # insert new tasks
                     if len(self.BP_priority_queue) == len(self.priority_queue):
                         is_FF = True
-                    elif len(self.BP_priority_queue) > len(self.priority_queue) and len(self.priority_queue) > 0 and self.BP_priority_queue[0] == self.priority_queue[0]:
-                            is_FF = True
+                    elif len(self.BP_priority_queue) > len(self.priority_queue) and len(self.priority_queue) > 0 and \
+                            self.BP_priority_queue[0] == self.priority_queue[0]:
+                        is_FF = True
                     else:
                         is_FF = False
-                        if is_FF:
-                            if len(self.BP_priority_queue) == 0:
-                                self.BP_priority_queue.append(self.idx)
-                                self.Server_BP_time_queue.append(
-                                    self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-                            else:
-                                for t in range(len(self.BP_priority_queue)):
-                                    if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
-                                            self.Server_BP_time_queue[t]:
-                                        self.BP_priority_queue.insert(t, self.idx)
-                                        self.Server_BP_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                         self.client_BP_time_queue[self.idx])
-                                        break
-                                    elif t == len(self.BP_priority_queue) - 1:
-                                        self.BP_priority_queue.append(self.idx)
-                                        self.Server_BP_time_queue.append(
-                                            self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
 
-                            if len(self.priority_queue) == 0 or len(self.priority_queue) == 1:
-                                self.priority_queue.append(self.idx)
-                                self.Server_FF_time_queue.append(
-                                    self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-                            else:
-                                for t in range(1, len(self.priority_queue)):
-                                    if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
-                                            self.Server_FF_time_queue[t]:
-                                        self.priority_queue.insert(t, self.idx)
-                                        self.Server_FF_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                         self.client_BP_time_queue[self.idx])
-                                        break
-                                    elif t == len(self.priority_queue) - 1:
-                                        self.priority_queue.append(self.idx)
-                                        self.Server_FF_time_queue.append(
-                                            self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
+                    if is_FF:
+                        if len(self.BP_priority_queue) == 0:
+                            self.BP_priority_queue.append(self.idx)
+                            self.Server_BP_time_queue.append(
+                                self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
                         else:
-                            if len(self.BP_priority_queue) == 0 or len(self.BP_priority_queue) == 1:
-                                self.BP_priority_queue.append(self.idx)
-                                self.Server_BP_time_queue.append(
-                                    self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-                            else:
-                                for t in range(1, len(self.BP_priority_queue)):
-                                    if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
-                                            self.Server_BP_time_queue[t]:
-                                        self.BP_priority_queue.insert(t, self.idx)
-                                        self.Server_BP_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                         self.client_BP_time_queue[self.idx])
-                                        break
-                                    elif t == len(self.BP_priority_queue) - 1:
-                                        self.BP_priority_queue.append(self.idx)
-                                        self.Server_BP_time_queue.append(
-                                            self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
+                            for t in range(len(self.BP_priority_queue)):
+                                if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
+                                        self.Server_BP_time_queue[t]:
+                                    self.BP_priority_queue.insert(t, self.idx)
+                                    self.Server_BP_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
+                                                                     self.client_BP_time_queue[self.idx])
+                                    break
+                                elif t == len(self.BP_priority_queue) - 1:
+                                    self.BP_priority_queue.append(self.idx)
+                                    self.Server_BP_time_queue.append(
+                                        self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
 
-                            if len(self.priority_queue) == 0:
-                                self.priority_queue.append(self.idx)
-                                self.Server_FF_time_queue.append(
-                                    self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-                            else:
-                                for t in range(len(self.priority_queue)):
-                                    if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
-                                            self.Server_FF_time_queue[t]:
-                                        self.priority_queue.insert(t, self.idx)
-                                        self.Server_FF_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                         self.client_BP_time_queue[self.idx])
-                                        break
-                                    elif t == len(self.priority_queue) - 1:
-                                        self.priority_queue.append(self.idx)
-                                        self.Server_FF_time_queue.append(
-                                            self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
+                        if len(self.priority_queue) == 0 or len(self.priority_queue) == 1:
+                            self.priority_queue.append(self.idx)
+                            self.Server_FF_time_queue.append(
+                                self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
+                        else:
+                            for t in range(1, len(self.priority_queue)):
+                                if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
+                                        self.Server_FF_time_queue[t]:
+                                    self.priority_queue.insert(t, self.idx)
+                                    self.Server_FF_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
+                                                                     self.client_BP_time_queue[self.idx])
+                                    break
+                                elif t == len(self.priority_queue) - 1:
+                                    self.priority_queue.append(self.idx)
+                                    self.Server_FF_time_queue.append(
+                                        self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
+                    else:
+                        if len(self.BP_priority_queue) == 0 or len(self.BP_priority_queue) == 1:
+                            self.BP_priority_queue.append(self.idx)
+                            self.Server_BP_time_queue.append(
+                                self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
+                        else:
+                            for t in range(1, len(self.BP_priority_queue)):
+                                if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
+                                        self.Server_BP_time_queue[t]:
+                                    self.BP_priority_queue.insert(t, self.idx)
+                                    self.Server_BP_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
+                                                                     self.client_BP_time_queue[self.idx])
+                                    break
+                                elif t == len(self.BP_priority_queue) - 1:
+                                    self.BP_priority_queue.append(self.idx)
+                                    self.Server_BP_time_queue.append(
+                                        self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
+
+                        if len(self.priority_queue) == 0:
+                            self.priority_queue.append(self.idx)
+                            self.Server_FF_time_queue.append(
+                                self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
+                        else:
+                            for t in range(len(self.priority_queue)):
+                                if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
+                                        self.Server_FF_time_queue[t]:
+                                    self.priority_queue.insert(t, self.idx)
+                                    self.Server_FF_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
+                                                                     self.client_BP_time_queue[self.idx])
+                                    break
+                                elif t == len(self.priority_queue) - 1:
+                                    self.priority_queue.append(self.idx)
+                                    self.Server_FF_time_queue.append(
+                                        self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
 
                 # Client idx's task is started in Server when it has the highest priority
                 # print('priority_queue:', self.priority_queue)
@@ -468,26 +481,31 @@ class Client(object):
                         if self.priority_queue[0] == self.idx:
                             # Sending activations to server and receiving gradients from server
                             print('client ', self.idx, ' :', self.count1, '/', len_batch)
-                            dfx, net_glob_server = train_server(client_fx, labels, iter, self.local_ep, self.idx, len_batch, self.net_glob_server,
-                                               self.lr, self.criterion, self.batch_acc_train, self.batch_loss_train, self.count1,
-                                               self.loss_train_collect_user, self.acc_train_collect_user, self.idx_collect,
-                                               self.num_users, self.priority_queue, self.Server_FF_time_queue, self.BP_priority_queue, self.lock)
+                            dfx, net_glob_server = train_server(client_fx, labels, iter, self.local_ep, self.idx,
+                                                                len_batch, self.net_glob_server,
+                                                                self.lr, self.criterion, self.batch_acc_train,
+                                                                self.batch_loss_train, self.count1,
+                                                                self.loss_train_collect_user,
+                                                                self.acc_train_collect_user, self.idx_collect,
+                                                                self.num_users, self.priority_queue,
+                                                                self.Server_FF_time_queue, self.BP_priority_queue,
+                                                                self.lock)
 
                             with self.lock:
                                 del self.BP_priority_queue[0]
                                 del self.Server_BP_time_queue[0]
                             break
 
-                #--------backward prop -------------
+                # --------backward prop -------------
                 BP_start_time = time.time()
-                fx.backward(dfx.to(torch.device("cuda:" + str(self.idx))))
+                fx.backward(dfx.to(torch.device("cuda:0")))
                 optimizer_client.step()
 
                 with self.lock:
                     del self.client_BP_time_queue[self.idx]
                     self.client_BP_time_queue.insert(self.idx, time.time() - BP_start_time)
 
-            #prRed('Client{} Train => Epoch: {}'.format(self.idx, ell))
+            # prRed('Client{} Train => Epoch: {}'.format(self.idx, ell))
         net.to('cpu')
         net_glob_server.to('cpu')
 
@@ -499,7 +517,8 @@ class Client(object):
         with torch.no_grad():
             len_batch = len(self.ldr_test)
             for batch_idx, (images, labels) in enumerate(self.ldr_test):
-                images, labels = images.to(torch.device("cuda:" + str(self.idx))), labels.to(torch.device("cuda:" + str(self.idx)))
+                # 修改为使用编号为 0 的 GPU 设备
+                images, labels = images.to(torch.device("cuda:0")), labels.to(torch.device("cuda:0"))
                 #---------forward prop-------------
                 fx = net(images)
 
@@ -523,15 +542,23 @@ def dataset_iid(dataset, num_users):
     return dict_users
 
 def multiprocessing_train_and_test(local, idx, net_glob_client, net_glob_server, w_locals_client, w_glob_server_buffer):
-    net_glob_client.to(torch.device("cuda:" + str(idx)))
-    net_glob_server.to(torch.device("cuda:0"))
-    # with torch.cuda.device(idx):
-    # Training ------------------
-    w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to(torch.device("cuda:" + str(idx))))
-    # print('w_client type:', type(w_client))
-    # print(w_client.device.type)
-    w_locals_client.append(copy.deepcopy(w_client))
+    # net_glob_client.to(torch.device("cuda:" + str(idx)))
+    # net_glob_server.to(torch.device("cuda:0"))
+    # # with torch.cuda.device(idx):
+    # # Training ------------------
+    # w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to(torch.device("cuda:" + str(idx))))
+    # # print('w_client type:', type(w_client))
+    # # print(w_client.device.type)
+    # w_locals_client.append(copy.deepcopy(w_client))
+    #
+    # w_glob_server_buffer.append(copy.deepcopy(w_glob_server))
 
+    # 单 GPU 环境下，将所有模型和数据都移到 GPU 0 上
+    net_glob_client.to(torch.device("cuda:0"))
+    net_glob_server.to(torch.device("cuda:0"))
+    # Training ------------------
+    w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to(torch.device("cuda:0")))
+    w_locals_client.append(copy.deepcopy(w_client))
     w_glob_server_buffer.append(copy.deepcopy(w_glob_server))
 
     # Testing -------------------
@@ -633,8 +660,8 @@ if __name__ == '__main__':
             normalize,
             ])
 
-    train_directory = os.path.join('/data/cifar-100-python', 'train1')
-    valid_directory = os.path.join('/data/cifar-100-python', 'val')
+    train_directory = os.path.join('./data/cifar-100-python', 'train1')
+    valid_directory = os.path.join('./data/cifar-100-python', 'val')
     dataset_train = datasets.ImageFolder(root=train_directory, transform=train_transform)
     dataset_test = datasets.ImageFolder(root=valid_directory, transform=test_transform)
 
@@ -692,7 +719,14 @@ if __name__ == '__main__':
         net_glob_client.load_state_dict(w_glob_client)
 
         # Update server-side global model
-        net_glob_server.module.load_state_dict(w_glob_server)  # 使用 module 加载状态字典
+        # net_glob_server.module.load_state_dict(w_glob_server)  # 使用 module 加载状态字典
+
+        # Update server-side global model
+        if isinstance(net_glob_server, torch.nn.DataParallel):
+            # 如果模型是 DataParallel 包装的，使用 module 加载状态字典
+            net_glob_server.module.load_state_dict(w_glob_server)
+        else:
+            net_glob_server.load_state_dict(w_glob_server)
 
         print("====================== PipeSFL V1 ========================")
         print('========== Train: Round {:3d} Time: {:2f}s ==============='.format(iter, time.time()-start_time))
