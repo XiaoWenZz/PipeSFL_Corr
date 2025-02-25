@@ -36,6 +36,7 @@ import copy
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # 使用单 GPU
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1' # RuntimeError: CUDA error: unspecified launch failure 调试
 
 # To print in color -------test/train of the client side
 def prRed(skk):
@@ -714,8 +715,12 @@ if __name__ == '__main__':
 
         # w_locals_client_copy = list(w_locals_client)
         # w_glob_client = FedAvg(w_locals_client_copy.to('CPU'))
-        w_glob_client = FedAvg(w_locals_client)
-        w_glob_server = FedAvg(w_glob_server_buffer)
+        w_locals_client_regular = list(w_locals_client)
+        # w_glob_client = FedAvg(w_locals_client)
+        w_glob_client = FedAvg(w_locals_client_regular)
+
+        w_glob_server_buffer_regular = list(w_glob_server_buffer)
+        w_glob_server = FedAvg(w_glob_server_buffer_regular)
 
         # Update client-side global model
         net_glob_client.load_state_dict(w_glob_client)
