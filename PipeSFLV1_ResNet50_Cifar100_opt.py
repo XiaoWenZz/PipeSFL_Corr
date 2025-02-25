@@ -239,6 +239,12 @@ def FedAvg(w):
         new_w_avg[new_k] = w_avg[k]
     w_avg = new_w_avg
 
+    # 打印所有客户端状态字典的键
+    for i, client_w in enumerate(w):
+        print(f"Keys in client {i}'s state_dict:")
+        for key in client_w.keys():
+            print(key)
+
     # 计算所有客户端权重的平均值
     for k in w_avg.keys():
         for i in range(1, len(w)):
