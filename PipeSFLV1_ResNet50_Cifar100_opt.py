@@ -141,15 +141,125 @@ class ResNet50_server_side(nn.Module):
 #         w_avg[k] = torch.div(w_avg[k], len(w))
 #     return w_avg
 
+# def FedAvg(w):
+#     if isinstance(w[0], dict) and next(iter(w[0])).startswith('module.'):
+#         # 如果键名有 module. 前缀，去掉前缀
+#         w = [{k.replace('module.', ''): v for k, v in state_dict.items()} for state_dict in w]
+#     w_avg = copy.deepcopy(w[0])
+#     for k in w_avg.keys():
+#         for i in range(1, len(w)):
+#             w_avg[k] += w[i][k]
+#         w_avg[k] = torch.div(w_avg[k], len(w))
+#     return w_avg
+
+# def FedAvg(w):
+#     # 初始化平均权重为第一个客户端的权重的深拷贝
+#     w_avg = copy.deepcopy(w[0])
+#     # 处理键名，去除 'module.' 前缀
+#     new_w_avg = {}
+#     for k in w_avg.keys():
+#         if k.startswith('module.'):
+#             new_k = k[7:]  # 去掉 'module.' 前缀
+#         else:
+#             new_k = k
+#         new_w_avg[new_k] = w_avg[k]
+#     w_avg = new_w_avg
+#
+#     # 计算所有客户端权重的平均值
+#     for k in w_avg.keys():
+#         for i in range(1, len(w)):
+#             client_w = w[i]
+#             # 处理当前客户端权重的键名，去除 'module.' 前缀
+#             if k in client_w:
+#                 key = k
+#             elif 'module.' + k in client_w:
+#                 key = 'module.' + k
+#             else:
+#                 continue
+#             if key.startswith('module.'):
+#                 key = key[7:]
+#             w_avg[k] += client_w[key]
+#         # 计算平均值
+#         w_avg[k] = torch.div(w_avg[k], len(w))
+#
+#     return w_avg
+
+# def FedAvg(w):
+#     # 初始化平均权重为第一个客户端的权重的深拷贝
+#     w_avg = copy.deepcopy(w[0])
+#     # 处理键名，去除 'module.' 前缀
+#     new_w_avg = {}
+#     for k in w_avg.keys():
+#         if k.startswith('module.'):
+#             new_k = k[7:]  # 去掉 'module.' 前缀
+#         else:
+#             new_k = k
+#         new_w_avg[new_k] = w_avg[k]
+#     w_avg = new_w_avg
+#
+#     # 打印所有客户端状态字典的键
+#     for i, client_w in enumerate(w):
+#         print(f"Keys in client {i}'s state_dict:")
+#         for key in client_w.keys():
+#             print(key)
+#
+#     # 计算所有客户端权重的平均值
+#     for k in w_avg.keys():
+#         for i in range(1, len(w)):
+#             client_w = w[i]
+#             # 处理当前客户端权重的键名，去除 'module.' 前缀
+#             if k in client_w:
+#                 key = k
+#             elif 'module.' + k in client_w:
+#                 key = 'module.' + k
+#             else:
+#                 print(f"Key {k} not found in client {i}'s state_dict. Skipping...")
+#                 continue
+#             if key.startswith('module.'):
+#                 key = key[7:]
+#             if key in client_w:
+#                 w_avg[k] += client_w[key]
+#             else:
+#                 print(f"Key {key} not found in client {i}'s state_dict after prefix removal. Skipping...")
+#         # 计算平均值
+#         w_avg[k] = torch.div(w_avg[k], len(w))
+#
+#     return w_avg
+
 def FedAvg(w):
-    if isinstance(w[0], dict) and next(iter(w[0])).startswith('module.'):
-        # 如果键名有 module. 前缀，去掉前缀
-        w = [{k.replace('module.', ''): v for k, v in state_dict.items()} for state_dict in w]
+    # 初始化平均权重为第一个客户端的权重的深拷贝
     w_avg = copy.deepcopy(w[0])
+    # 处理键名，去除 'module.' 前缀
+    new_w_avg = {}
+    for k in w_avg.keys():
+        if k.startswith('module.'):
+            new_k = k[7:]  # 去掉 'module.' 前缀
+        else:
+            new_k = k
+        new_w_avg[new_k] = w_avg[k]
+    w_avg = new_w_avg
+
+    # 计算所有客户端权重的平均值
     for k in w_avg.keys():
         for i in range(1, len(w)):
-            w_avg[k] += w[i][k]
+            client_w = w[i]
+            # 处理当前客户端权重的键名，去除 'module.' 前缀
+            if k in client_w:
+                key = k
+            elif 'module.' + k in client_w:
+                key = 'module.' + k
+            else:
+                print(f"Key {k} not found in client {i}'s state_dict. Skipping...")
+                continue
+            if key.startswith('module.'):
+                key = key[7:]
+            if key in client_w:
+                w_avg[k] += client_w[key]
+            else:
+                print(f"Key {key} not found in client {i}'s state_dict after prefix removal. Skipping...")
+        # 计算平均值
         w_avg[k] = torch.div(w_avg[k], len(w))
+
     return w_avg
 
 def calculate_accuracy(fx, y):
@@ -590,7 +700,7 @@ if __name__ == '__main__':
     # ===================================================================
     # No. of users
     num_users = 3
-    epochs = 200
+    epochs = 1
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
     train_times = []  # 新增：用于存储每一轮的训练时间
