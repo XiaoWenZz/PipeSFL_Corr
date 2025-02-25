@@ -27,6 +27,7 @@ import os
 from torchvision import datasets, models
 import multiprocessing
 import time
+import matplotlib.pyplot as plt
 
 # import matplotlib
 # matplotlib.use('Agg')
@@ -591,6 +592,7 @@ if __name__ == '__main__':
     epochs = 200
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
+    train_times = []  # 新增：用于存储每一轮的训练时间
 
     net_glob_client = ResNet50_client_side()
     print(net_glob_client)
@@ -728,8 +730,11 @@ if __name__ == '__main__':
         else:
             net_glob_server.load_state_dict(w_glob_server)
 
+        train_time = time.time() - start_time # 新增：计算当前轮次的训练时间
+        train_times.append(train_time) # 新增：将当前轮次的训练时间添加到列表中
+
         print("====================== PipeSFL V1 ========================")
-        print('========== Train: Round {:3d} Time: {:2f}s ==============='.format(iter, time.time()-start_time))
+        print('========== Train: Round {:3d} Time: {:2f}s ==============='.format(iter, train_time))
         print("==========================================================")
     #===================================================================================
 
@@ -738,3 +743,29 @@ if __name__ == '__main__':
     #=============================================================================
     #                         Program Completed
     #=============================================================================
+
+    # 绘制训练时间曲线
+    plt.plot(range(epochs), train_times)
+    plt.xlabel('Training Rounds')
+    plt.ylabel('Training Time (s)')
+    plt.title('Training Time Curve')
+    plt.grid(True)
+    # 保存图片 按照当前时间保存
+    plt.savefig('train_time_curve' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
+
+    # 保存模型 命名为 模型名+当前时间
+    torch.save(net_glob_client.state_dict(), 'PipeSFLV1_ResNet50_Cifar100_Client' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.pth')
+    torch.save(net_glob_server.state_dict(), 'PipeSFLV1_ResNet50_Cifar100_Server' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.pth')
+    print('Model saved successfully!')
+
+    # 保存acc和loss数据
+    acc_train_df = pd.DataFrame(acc_train_collect)
+    loss_train_df = pd.DataFrame(loss_train_collect)
+    acc_test_df = pd.DataFrame(acc_test_collect)
+    loss_test_df = pd.DataFrame(loss_test_collect)
+    # 命名为 模型名+ 数据名+当前时间
+    acc_train_df.to_csv('PipeSFLV1_ResNet50_Cifar100_Client_Acc' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.csv', index=False)
+    loss_train_df.to_csv('PipeSFLV1_ResNet50_Cifar100_Client_Loss' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.csv', index=False)
+    acc_test_df.to_csv('PipeSFLV1_ResNet50_Cifar100_Server_Acc' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.csv', index=False)
+    loss_test_df.to_csv('PipeSFLV1_ResNet50_Cifar100_Server_Loss' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.csv', index=False)
+    print('Data saved successfully!')
