@@ -240,7 +240,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
 # Server - side functions associated with Testing
 def evaluate_server(fx_client, y, idx, len_batch, ell):
     global net_glob_server, criterion, batch_acc_test, batch_loss_test
-    global loss_test_collect, acc_test_collect, count2, num_users, acc_avg_train_all, loss_avg_train_all, l_epoch_check, fed_check
+    global loss_test_collect, acc_test_collect, count2, num_users, l_epoch_check, fed_check
     global loss_test_collect_user, acc_test_collect_user, acc_avg_all_user_train, loss_avg_all_user_train
     net_glob_server = net_glob_server.to('cuda:0')  # 将模型移到 GPU 上
     net_glob_server.eval()
@@ -295,6 +295,12 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
                 loss_test_collect_user = []
 
                 print("====================== SERVER V1==========================")
+                # 确保 acc_avg_all_user_train 和 loss_avg_all_user_train 有定义
+                if 'acc_avg_all_user_train' not in globals():
+                    acc_avg_all_user_train = 0
+                if 'loss_avg_all_user_train' not in globals():
+                    loss_avg_all_user_train = 0
+
                 print(' Train: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user_train,
                                                                                           loss_avg_all_user_train))
                 print(' Test: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user,
@@ -428,7 +434,7 @@ if __name__ == '__main__':
     # ===================================================================
     # No. of users
     num_users = 3
-    epochs = 200
+    epochs = 3
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
     train_times = []
