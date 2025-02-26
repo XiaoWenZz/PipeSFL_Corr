@@ -160,6 +160,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
                  idx_collect,
                  num_users):
     global l_epoch_check, fed_check
+    net_glob_server = net_glob_server.to('cuda:0')  # 将模型移到 GPU 上
     net_glob_server.train()
     optimizer_server = torch.optim.Adam(net_glob_server.parameters(), lr=lr)
 
@@ -241,7 +242,7 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
     global net_glob_server, criterion, batch_acc_test, batch_loss_test
     global loss_test_collect, acc_test_collect, count2, num_users, acc_avg_train_all, loss_avg_train_all, l_epoch_check, fed_check
     global loss_test_collect_user, acc_test_collect_user, acc_avg_all_user_train, loss_avg_all_user_train
-
+    net_glob_server = net_glob_server.to('cuda:0')  # 将模型移到 GPU 上
     net_glob_server.eval()
 
     with torch.no_grad():
