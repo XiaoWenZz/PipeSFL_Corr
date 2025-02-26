@@ -154,6 +154,161 @@ def calculate_accuracy(fx, y):
     return acc
 
 
+# # Server - side function associated with Training
+# def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_server, lr, criterion,
+#                  batch_acc_train, batch_loss_train, count1, loss_train_collect_user, acc_train_collect_user,
+#                  idx_collect,
+#                  num_users):
+#     global l_epoch_check, fed_check
+#     net_glob_server = net_glob_server.to('cuda:0')  # 将模型移到 GPU 上
+#     net_glob_server.train()
+#     optimizer_server = torch.optim.Adam(net_glob_server.parameters(), lr=lr)
+#
+#     # train and update
+#     optimizer_server.zero_grad()
+#
+#     fx_client = fx_client.requires_grad_(True)
+#     y = y
+#
+#     # ---------forward prop-------------
+#     fx_server = net_glob_server(fx_client)
+#
+#     # calculate loss
+#     loss = criterion(fx_server, y)
+#     # calculate accuracy
+#     acc = calculate_accuracy(fx_server, y)
+#
+#     # --------backward prop--------------
+#     loss.backward()
+#     dfx_client = fx_client.grad.clone().detach()
+#     optimizer_server.step()
+#
+#     batch_loss_train.append(loss.item())
+#     batch_acc_train.append(acc.item())
+#
+#     # count1: to track the completion of the local batch associated with one client
+#     count1 += 1
+#     if count1 == len_batch:
+#         acc_avg_train = sum(batch_acc_train) / len(batch_acc_train)  # it has accuracy for one batch
+#         loss_avg_train = sum(batch_loss_train) / len(batch_loss_train)
+#
+#         batch_acc_train = []
+#         batch_loss_train = []
+#         count1 = 0
+#
+#         prRed('Client{} Train => Local Epoch: {} \tAcc: {:.3f} \tLoss: {:.4f}'.format(idx, l_epoch_count, acc_avg_train,
+#                                                                                       loss_avg_train))
+#
+#         # If one local epoch is completed, after this a new client will come
+#         if l_epoch_count == l_epoch - 1:
+#
+#             l_epoch_check = True  # to evaluate_server function - to check local epoch has completed or not
+#
+#             # we store the last accuracy in the last batch of the epoch and it is not the average of all local epochs
+#             # this is because we work on the last trained model and its accuracy (not earlier cases)
+#
+#             # print("accuracy = ", acc_avg_train)
+#             acc_avg_train_all = acc_avg_train
+#             loss_avg_train_all = loss_avg_train
+#
+#             # accumulate accuracy and loss for each new user
+#             loss_train_collect_user.append(loss_avg_train_all)
+#             acc_train_collect_user.append(acc_avg_train_all)
+#
+#             # collect the id of each new user
+#             if idx not in idx_collect:
+#                 idx_collect.append(idx)
+#
+#         # This is to check if all users are served for one round --------------------
+#         if len(idx_collect) == num_users:
+#             fed_check = True  # to evaluate_server function  - to check fed check has hitted
+#             # all users served for one round ------------------------- output print and update is done in evaluate_server()
+#             # for nicer display
+#
+#             idx_collect = []
+#
+#             acc_avg_all_user_train = sum(acc_train_collect_user) / len(acc_train_collect_user)
+#             loss_avg_all_user_train = sum(loss_train_collect_user) / len(loss_train_collect_user)
+#
+#             acc_train_collect_user = []
+#             loss_train_collect_user = []
+#
+#     # send gradients to the client
+#     return dfx_client, net_glob_server
+#
+#
+# # Server - side functions associated with Testing
+# def evaluate_server(fx_client, y, idx, len_batch, ell):
+#     global net_glob_server, criterion, batch_acc_test, batch_loss_test
+#     global loss_test_collect, acc_test_collect, count2, num_users, l_epoch_check, fed_check
+#     global loss_test_collect_user, acc_test_collect_user, acc_avg_all_user_train, loss_avg_all_user_train
+#     net_glob_server = net_glob_server.to('cuda:0')  # 将模型移到 GPU 上
+#     net_glob_server.eval()
+#
+#     with torch.no_grad():
+#         fx_client = fx_client.to('cuda:0')
+#         y = y.to('cuda:0')
+#         # ---------forward prop-------------
+#         fx_server = net_glob_server(fx_client)
+#
+#         # calculate loss
+#         loss = criterion(fx_server, y)
+#         # calculate accuracy
+#         acc = calculate_accuracy(fx_server, y)
+#
+#         batch_loss_test.append(loss.item())
+#         batch_acc_test.append(acc.item())
+#
+#         count2 += 1
+#         if count2 == len_batch:
+#             acc_avg_test = sum(batch_acc_test) / len(batch_acc_test)
+#             loss_avg_test = sum(batch_loss_test) / len(batch_loss_test)
+#
+#             batch_acc_test = []
+#             batch_loss_test = []
+#             count2 = 0
+#
+#             print('Client{} Test =>                   \tAcc: {:.3f} \tLoss: {:.4f}'.format(idx, acc_avg_test,
+#                                                                                            loss_avg_test))
+#
+#             # if a local epoch is completed
+#             if l_epoch_check:
+#                 l_epoch_check = False
+#
+#                 # Store the last accuracy and loss
+#                 acc_avg_test_all = acc_avg_test
+#                 loss_avg_test_all = loss_avg_test
+#
+#                 loss_test_collect_user.append(loss_avg_test_all)
+#                 acc_test_collect_user.append(acc_avg_test_all)
+#
+#             # if all users are served for one round ----------
+#             if fed_check:
+#                 fed_check = False
+#
+#                 acc_avg_all_user = sum(acc_test_collect_user) / len(acc_test_collect_user)
+#                 loss_avg_all_user = sum(loss_test_collect_user) / len(loss_test_collect_user)
+#
+#                 loss_test_collect.append(loss_avg_all_user)
+#                 acc_test_collect.append(acc_avg_all_user)
+#                 acc_test_collect_user = []
+#                 loss_test_collect_user = []
+#
+#                 print("====================== SERVER V1==========================")
+#                 # 确保 acc_avg_all_user_train 和 loss_avg_all_user_train 有定义
+#                 # if 'acc_avg_all_user_train' not in globals():
+#                 #     acc_avg_all_user_train = 0
+#                 # if 'loss_avg_all_user_train' not in globals():
+#                 #     loss_avg_all_user_train = 0
+#
+#                 print(' Train: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user_train,
+#                                                                                           loss_avg_all_user_train))
+#                 print(' Test: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user,
+#                                                                                          loss_avg_all_user))
+#                 print("==========================================================")
+#
+#     return
+
 # Server - side function associated with Training
 def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_server, lr, criterion,
                  batch_acc_train, batch_loss_train, count1, loss_train_collect_user, acc_train_collect_user,
@@ -227,8 +382,17 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
 
             idx_collect = []
 
-            acc_avg_all_user_train = sum(acc_train_collect_user) / len(acc_train_collect_user)
-            loss_avg_all_user_train = sum(loss_train_collect_user) / len(loss_train_collect_user)
+            # 确保列表中有数据再计算平均
+            if len(acc_train_collect_user) > 0:
+                acc_avg_all_user_train = sum(acc_train_collect_user) / len(acc_train_collect_user)
+                loss_avg_all_user_train = sum(loss_train_collect_user) / len(loss_train_collect_user)
+            else:
+                acc_avg_all_user_train = 0
+                loss_avg_all_user_train = 0
+
+            global acc_avg_all_user_train_global, loss_avg_all_user_train_global
+            acc_avg_all_user_train_global = acc_avg_all_user_train
+            loss_avg_all_user_train_global = loss_avg_all_user_train
 
             acc_train_collect_user = []
             loss_train_collect_user = []
@@ -241,7 +405,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
 def evaluate_server(fx_client, y, idx, len_batch, ell):
     global net_glob_server, criterion, batch_acc_test, batch_loss_test
     global loss_test_collect, acc_test_collect, count2, num_users, l_epoch_check, fed_check
-    global loss_test_collect_user, acc_test_collect_user, acc_avg_all_user_train, loss_avg_all_user_train
+    global loss_test_collect_user, acc_test_collect_user, acc_avg_all_user_train_global, loss_avg_all_user_train_global
     net_glob_server = net_glob_server.to('cuda:0')  # 将模型移到 GPU 上
     net_glob_server.eval()
 
@@ -295,19 +459,18 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
                 loss_test_collect_user = []
 
                 print("====================== SERVER V1==========================")
-                # 确保 acc_avg_all_user_train 和 loss_avg_all_user_train 有定义
-                if 'acc_avg_all_user_train' not in globals():
-                    acc_avg_all_user_train = 0
-                if 'loss_avg_all_user_train' not in globals():
-                    loss_avg_all_user_train = 0
-
-                print(' Train: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user_train,
-                                                                                          loss_avg_all_user_train))
+                print(' Train: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user_train_global,
+                                                                                          loss_avg_all_user_train_global))
                 print(' Test: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user,
                                                                                          loss_avg_all_user))
                 print("==========================================================")
 
     return
+
+
+# 在全局作用域中定义新的全局变量
+acc_avg_all_user_train_global = 0
+loss_avg_all_user_train_global = 0
 
 
 # ==============================================================================================================
@@ -434,7 +597,7 @@ if __name__ == '__main__':
     # ===================================================================
     # No. of users
     num_users = 3
-    epochs = 3
+    epochs = 1
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
     train_times = []
