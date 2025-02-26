@@ -756,18 +756,34 @@ if __name__ == '__main__':
     #                         Program Completed
     #=============================================================================
 
+    # 确保输出目录存在
+    curve_dir = 'output/curve'
+    model_dir = 'output/model'
+    acc_dir = 'output/acc'
+    loss_dir = 'output/loss'
+
+    for directory in [curve_dir, model_dir, acc_dir, loss_dir]:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
     # 绘制训练时间曲线
     plt.plot(range(epochs), train_times)
     plt.xlabel('Training Rounds')
     plt.ylabel('Training Time (s)')
     plt.title('Training Time Curve')
     plt.grid(True)
-    # 保存图片 按照当前时间保存
-    plt.savefig('train_time_curve' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
+    # 保存图片 按照当前时间保存 目录为 output/curve
+    curve_filename = os.path.join(curve_dir,
+                                  'train_time_curve' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
+    plt.savefig(curve_filename)
 
     # 保存模型 命名为 模型名+当前时间
-    torch.save(net_glob_client.state_dict(), 'PipeSFLV1_ResNet50_Cifar100_Client' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.pth')
-    torch.save(net_glob_server.state_dict(), 'PipeSFLV1_ResNet50_Cifar100_Server' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.pth')
+    client_model_filename = os.path.join(model_dir, 'PipeSFLV1_ResNet50_Cifar100_Client' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                         time.localtime()) + '.pth')
+    server_model_filename = os.path.join(model_dir, 'PipeSFLV1_ResNet50_Cifar100_Server' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                         time.localtime()) + '.pth')
+    torch.save(net_glob_client.state_dict(), client_model_filename)
+    torch.save(net_glob_server.state_dict(), server_model_filename)
     print('Model saved successfully!')
 
     # 保存acc和loss数据
@@ -775,9 +791,22 @@ if __name__ == '__main__':
     loss_train_df = pd.DataFrame(loss_train_collect)
     acc_test_df = pd.DataFrame(acc_test_collect)
     loss_test_df = pd.DataFrame(loss_test_collect)
-    # 命名为 模型名+ 数据名+当前时间
-    acc_train_df.to_csv('PipeSFLV1_ResNet50_Cifar100_Client_Acc' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.csv', index=False)
-    loss_train_df.to_csv('PipeSFLV1_ResNet50_Cifar100_Client_Loss' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.csv', index=False)
-    acc_test_df.to_csv('PipeSFLV1_ResNet50_Cifar100_Server_Acc' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.csv', index=False)
-    loss_test_df.to_csv('PipeSFLV1_ResNet50_Cifar100_Server_Loss' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.csv', index=False)
+    # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
+    acc_train_filename = os.path.join(acc_dir, 'PipeSFLV1_ResNet50_Cifar100_Client_Acc' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                        time.localtime()) + '.csv')
+    acc_train_df.to_csv(acc_train_filename, index=False)
+    # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
+    loss_train_filename = os.path.join(loss_dir,
+                                       'PipeSFLV1_ResNet50_Cifar100_Client_Loss' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                 time.localtime()) + '.csv')
+    loss_train_df.to_csv(loss_train_filename, index=False)
+    # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
+    acc_test_filename = os.path.join(acc_dir, 'PipeSFLV1_ResNet50_Cifar100_Server_Acc' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                       time.localtime()) + '.csv')
+    acc_test_df.to_csv(acc_test_filename, index=False)
+    # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
+    loss_test_filename = os.path.join(loss_dir,
+                                      'PipeSFLV1_ResNet50_Cifar100_Server_Loss' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                time.localtime()) + '.csv')
+    loss_test_df.to_csv(loss_test_filename, index=False)
     print('Data saved successfully!')
