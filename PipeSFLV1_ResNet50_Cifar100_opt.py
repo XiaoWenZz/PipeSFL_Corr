@@ -386,7 +386,8 @@ class Client(object):
         self.w_glob_server_buffer = w_glob_server_buffer
         self.lock = lock
         #self.selected_clients = []
-        self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size=256, shuffle=True)
+        # self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size=256, shuffle=True)
+        self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size=64, shuffle=True)
         self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size=256, shuffle=True)
 
     def train(self, net):
@@ -606,7 +607,7 @@ if __name__ == '__main__':
     # ===================================================================
     # No. of users
     num_users = 3
-    epochs = 4
+    epochs = 20
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
     train_times = []  # 新增：用于存储每一轮的训练时间
