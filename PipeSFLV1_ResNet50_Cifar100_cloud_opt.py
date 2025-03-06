@@ -46,6 +46,7 @@ def prRed(skk):
 def prGreen(skk):
     print("\033[92m {}\033[00m".format(skk))
 
+
 # =====================================================================================================
 #                           Client-side Model definition
 # =====================================================================================================
@@ -77,6 +78,7 @@ class BasicBlock(nn.Module):
         out = torch.relu(out)
         return out
 
+
 class ResNet50_client_side(nn.Module):
     def __init__(self):
         super(ResNet50_client_side, self).__init__()
@@ -98,6 +100,7 @@ class ResNet50_client_side(nn.Module):
         out = torch.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         return out
+
 
 # =====================================================================================================
 #                           Server-side Model definition
@@ -131,6 +134,7 @@ class ResNet50_server_side(nn.Module):
         out = self.fc(out)
         return out
 
+
 # ====================================================================================================
 #                                  Server Side Programs
 # ====================================================================================================
@@ -142,6 +146,7 @@ def FedAvg(w):
             w_avg[k] += w[i][k]
         w_avg[k] = torch.div(w_avg[k], len(w))
     return w_avg
+
 
 def calculate_accuracy(fx, y):
     preds = fx.max(1, keepdim=True)[1]
@@ -258,11 +263,12 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     return dfx_client, net_glob_server
 
 # Server-side functions associated with Testing
-def evaluate_server(fx_client, y, idx, len_batch, ell):
-    global net_glob_server, criterion, batch_acc_test, batch_loss_test
+def evaluate_server(net_glob_server, fx_client, y, idx, len_batch, ell):
+    global criterion, batch_acc_test, batch_loss_test
     global loss_test_collect, acc_test_collect, count2, num_users, acc_avg_train_all, loss_avg_train_all, l_epoch_check, fed_check
     global loss_test_collect_user, acc_test_collect_user, acc_avg_all_user_train, loss_avg_all_user_train
 
+    net_glob_server.to('cuda:' + str(idx))
     net_glob_server.eval()
 
     with torch.no_grad():
@@ -522,7 +528,7 @@ class Client(object):
                 fx = net(images)
 
                 # Sending activations to server
-                evaluate_server(fx, labels, self.idx, len_batch, ell)
+                evaluate_server(self.net_glob_server, fx, labels, self.idx, len_batch, ell)
 
             # prRed('Client{} Test => Epoch: {}'.format(self.idx, ell))
 
@@ -554,7 +560,7 @@ def multiprocessing_train_and_test(local, idx, net_glob_client, net_glob_server,
     w_glob_server_buffer.append(copy.deepcopy(w_glob_server))
 
     # Testing -------------------
-    # local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:'+str(idx)), ell=iter)
+    local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:'+str(idx)), ell=iter)
 
 
 if __name__ == '__main__':
@@ -584,7 +590,7 @@ if __name__ == '__main__':
     # ===================================================================
     # No. of users
     num_users = 3
-    epochs = 50
+    epochs = 5
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
     train_times = []
@@ -797,3 +803,11 @@ if __name__ == '__main__':
     # =============================================================================
     #                         Program Completed
     # =============================================================================
+
+
+
+
+
+
+
+

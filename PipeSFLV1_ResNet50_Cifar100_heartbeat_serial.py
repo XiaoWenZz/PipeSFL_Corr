@@ -26,8 +26,8 @@ import random
 import numpy as np
 import os
 from torchvision import datasets, models
-import multiprocessing
 import time
+import multiprocessing
 
 # import matplotlib
 # matplotlib.use('Agg')
@@ -35,7 +35,7 @@ import time
 import copy
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 
 # To print in color -------test/train of the client side
@@ -45,6 +45,7 @@ def prRed(skk):
 
 def prGreen(skk):
     print("\033[92m {}\033[00m".format(skk))
+
 
 # =====================================================================================================
 #                           Client-side Model definition
@@ -77,6 +78,7 @@ class BasicBlock(nn.Module):
         out = torch.relu(out)
         return out
 
+
 class ResNet50_client_side(nn.Module):
     def __init__(self):
         super(ResNet50_client_side, self).__init__()
@@ -98,6 +100,7 @@ class ResNet50_client_side(nn.Module):
         out = torch.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         return out
+
 
 # =====================================================================================================
 #                           Server-side Model definition
@@ -131,6 +134,7 @@ class ResNet50_server_side(nn.Module):
         out = self.fc(out)
         return out
 
+
 # ====================================================================================================
 #                                  Server Side Programs
 # ====================================================================================================
@@ -141,7 +145,9 @@ def FedAvg(w):
         for i in range(1, len(w)):
             w_avg[k] += w[i][k]
         w_avg[k] = torch.div(w_avg[k], len(w))
+        w_avg[k] = w_avg[k].to('cuda:0')  # 添加这一行，确保权重在 GPU 上
     return w_avg
+
 
 def calculate_accuracy(fx, y):
     preds = fx.max(1, keepdim=True)[1]
@@ -154,7 +160,7 @@ def calculate_accuracy(fx, y):
 def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_server, lr, criterion,
                  batch_acc_train, batch_loss_train, count1, loss_train_collect_user, acc_train_collect_user,
                  idx_collect,
-                 num_users, priority_queue, Server_FF_time_queue, BP_priority_queue, lock):
+                 num_users):
     global l_epoch_check, fed_check
     # global loss_train_collect, acc_train_collect
     # global loss_train_collect_user, acc_train_collect_user
@@ -183,13 +189,6 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     loss = criterion(fx_server, y)
     # calculate accuracy
     acc = calculate_accuracy(fx_server, y)
-
-    with lock:
-        del priority_queue[0]
-        del Server_FF_time_queue[0]
-    while True:
-        if BP_priority_queue[0] == idx:
-            break
 
     # --------backward prop--------------
     loss.backward()
@@ -266,8 +265,8 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
     net_glob_server.eval()
 
     with torch.no_grad():
-        fx_client = fx_client.to('cuda:' + str(idx))
-        y = y.to('cuda:' + str(idx))
+        fx_client = fx_client.to('cuda:0')
+        y = y.to('cuda:0')
         # ---------forward prop-------------
         fx_server = net_glob_server(fx_client)
 
@@ -323,7 +322,6 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
 
     return
 
-
 # ==============================================================================================================
 #                                       Clients Side Program
 # ==============================================================================================================
@@ -339,14 +337,11 @@ class DatasetSplit(Dataset):
         image, label = self.dataset[self.idxs[item]]
         return image, label
 
-
 # Client-side functions associated with Training and Testing
 class Client(object):
     def __init__(self, net_client_model, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
-                 priority_queue, BP_priority_queue,
-                 Server_FF_time_queue, Server_BP_time_queue, client_BP_time_queue, client_FF_time_queue,
-                 w_glob_server_buffer, lock,
-                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None):
+                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None):
+        self.heartbeat_queue = heartbeat_queue
         self.idx = idx
         # self.device = device
         self.lr = lr
@@ -360,173 +355,57 @@ class Client(object):
         self.count1 = 0
         self.idx_collect = idx_collect
         self.num_users = num_users
-        self.priority_queue = priority_queue
-        self.BP_priority_queue = BP_priority_queue
-        self.Server_FF_time_queue = Server_FF_time_queue
-        self.Server_BP_time_queue = Server_BP_time_queue
-        self.client_BP_time_queue = client_BP_time_queue
-        self.client_FF_time_queue = client_FF_time_queue
-        self.w_glob_server_buffer = w_glob_server_buffer
-        self.lock = lock
         # self.selected_clients = []
         self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size=256, shuffle=True)
         self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size=256, shuffle=True)
 
     def train(self, net):
-        net.train()
-        optimizer_client = torch.optim.Adam(net.parameters(), lr=self.lr)
+        try:
+            self.heartbeat_queue.put((self.idx, 'start'))
+            net.train()
+            optimizer_client = torch.optim.Adam(net.parameters(), lr=self.lr)
 
-        for iter in range(self.local_ep):
-            len_batch = len(self.ldr_train)
-            for batch_idx, (images, labels) in enumerate(self.ldr_train):
-                FF_start_time = time.time()
-                images, labels = images.to('cuda:' + str(self.idx)), labels.to('cuda:3')
+            for iter in range(self.local_ep):
+                len_batch = len(self.ldr_train)
+                for batch_idx, (images, labels) in enumerate(self.ldr_train):
+                    images, labels = images.to('cuda:0'), labels.to('cuda:0')
 
-                optimizer_client.zero_grad()
-                # ---------forward prop-------------
-                fx = net(images)
-                client_fx = fx.clone().detach()
+                    optimizer_client.zero_grad()
+                    fx = net(images)
+                    client_fx = fx.clone().detach()
 
-                # transmit client_fx to server
-                client_fx = client_fx.to('cuda:3')
+                    dfx, net_glob_server = train_server(client_fx, labels, iter, self.local_ep, self.idx,
+                                                        len_batch, self.net_glob_server,
+                                                        self.lr, self.criterion, self.batch_acc_train,
+                                                        self.batch_loss_train, self.count1,
+                                                        self.loss_train_collect_user,
+                                                        self.acc_train_collect_user, self.idx_collect,
+                                                        self.num_users)
 
-                with self.lock:
-                    del self.client_FF_time_queue[self.idx]
-                    self.client_FF_time_queue.insert(self.idx, time.time() - FF_start_time)
+                    fx.backward(dfx.to('cuda:0'))
+                    optimizer_client.step()
 
-                    self.count1 = self.count1 + 1
-
-                    # insert new tasks
-                    if len(self.BP_priority_queue) == len(self.priority_queue):
-                        is_FF = True
-                    elif len(self.BP_priority_queue) > len(self.priority_queue) and len(self.priority_queue) > 0 and \
-                            self.BP_priority_queue[0] == self.priority_queue[0]:
-                        is_FF = True
-                    else:
-                        is_FF = False
-
-                    if is_FF:
-                        if len(self.BP_priority_queue) == 0:
-                            self.BP_priority_queue.append(self.idx)
-                            self.Server_BP_time_queue.append(
-                                self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-                        else:
-                            for t in range(len(self.BP_priority_queue)):
-                                if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
-                                        self.Server_BP_time_queue[t]:
-                                    self.BP_priority_queue.insert(t, self.idx)
-                                    self.Server_BP_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                     self.client_BP_time_queue[self.idx])
-                                    break
-                                elif t == len(self.BP_priority_queue) - 1:
-                                    self.BP_priority_queue.append(self.idx)
-                                    self.Server_BP_time_queue.append(
-                                        self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-
-                        if len(self.priority_queue) == 0 or len(self.priority_queue) == 1:
-                            self.priority_queue.append(self.idx)
-                            self.Server_FF_time_queue.append(
-                                self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-                        else:
-                            for t in range(1, len(self.priority_queue)):
-                                if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
-                                        self.Server_FF_time_queue[t]:
-                                    self.priority_queue.insert(t, self.idx)
-                                    self.Server_FF_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                     self.client_BP_time_queue[self.idx])
-                                    break
-                                elif t == len(self.priority_queue) - 1:
-                                    self.priority_queue.append(self.idx)
-                                    self.Server_FF_time_queue.append(
-                                        self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-                    else:
-                        if len(self.BP_priority_queue) == 0 or len(self.BP_priority_queue) == 1:
-                            self.BP_priority_queue.append(self.idx)
-                            self.Server_BP_time_queue.append(
-                                self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-                        else:
-                            for t in range(1, len(self.BP_priority_queue)):
-                                if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
-                                        self.Server_BP_time_queue[t]:
-                                    self.BP_priority_queue.insert(t, self.idx)
-                                    self.Server_BP_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                     self.client_BP_time_queue[self.idx])
-                                    break
-                                elif t == len(self.BP_priority_queue) - 1:
-                                    self.BP_priority_queue.append(self.idx)
-                                    self.Server_BP_time_queue.append(
-                                        self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-
-                        if len(self.priority_queue) == 0:
-                            self.priority_queue.append(self.idx)
-                            self.Server_FF_time_queue.append(
-                                self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-                        else:
-                            for t in range(len(self.priority_queue)):
-                                if self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx] > \
-                                        self.Server_FF_time_queue[t]:
-                                    self.priority_queue.insert(t, self.idx)
-                                    self.Server_FF_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                     self.client_BP_time_queue[self.idx])
-                                    break
-                                elif t == len(self.priority_queue) - 1:
-                                    self.priority_queue.append(self.idx)
-                                    self.Server_FF_time_queue.append(
-                                        self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
-
-                # Client idx's task is started in Server when it has the highest priority
-                # print('priority_queue:', self.priority_queue)
-                while True:
-                    if len(self.priority_queue) >= 1:
-                        if self.priority_queue[0] == self.idx:
-                            # Sending activations to server and receiving gradients from server
-                            print('client ', self.idx, ' :', self.count1, '/', len_batch)
-                            dfx, net_glob_server = train_server(client_fx, labels, iter, self.local_ep, self.idx,
-                                                                len_batch, self.net_glob_server,
-                                                                self.lr, self.criterion, self.batch_acc_train,
-                                                                self.batch_loss_train, self.count1,
-                                                                self.loss_train_collect_user,
-                                                                self.acc_train_collect_user, self.idx_collect,
-                                                                self.num_users, self.priority_queue,
-                                                                self.Server_FF_time_queue, self.BP_priority_queue,
-                                                                self.lock)
-
-                            with self.lock:
-                                del self.BP_priority_queue[0]
-                                del self.Server_BP_time_queue[0]
-                            break
-
-                # --------backward prop -------------
-                BP_start_time = time.time()
-                fx.backward(dfx.to('cuda:' + str(self.idx)))
-                optimizer_client.step()
-
-                with self.lock:
-                    del self.client_BP_time_queue[self.idx]
-                    self.client_BP_time_queue.insert(self.idx, time.time() - BP_start_time)
-
-            # prRed('Client{} Train => Epoch: {}'.format(self.idx, ell))
-        net.to('cpu')
-        net_glob_server.to('cpu')
-
-        return net.state_dict(), net_glob_server.state_dict()
+            net = net.to('cuda:0')  # 添加这一行，确保模型在 GPU 上
+            net_glob_server = net_glob_server.to('cuda:0')  # 添加这一行，确保模型在 GPU 上
+            return net.state_dict(), net_glob_server.state_dict()
+        finally:
+            self.heartbeat_queue.put((self.idx, 'end'))
 
     def evaluate(self, net, ell):
-        net.eval()
+        try:
+            self.heartbeat_queue.put((self.idx, 'start'))
+            net.eval()
 
-        with torch.no_grad():
-            len_batch = len(self.ldr_test)
-            for batch_idx, (images, labels) in enumerate(self.ldr_test):
-                images, labels = images.to('cuda:' + str(self.idx)), labels.to('cuda:' + str(self.idx))
-                # ---------forward prop-------------
-                fx = net(images)
+            with torch.no_grad():
+                len_batch = len(self.ldr_test)
+                for batch_idx, (images, labels) in enumerate(self.ldr_test):
+                    images, labels = images.to('cuda:0'), labels.to('cuda:0')
+                    fx = net(images)
 
-                # Sending activations to server
-                evaluate_server(fx, labels, self.idx, len_batch, ell)
+                    evaluate_server(fx, labels, self.idx, len_batch, ell)
 
-            # prRed('Client{} Test => Epoch: {}'.format(self.idx, ell))
-
-        return
+        finally:
+            self.heartbeat_queue.put((self.idx, 'end'))
 
 
 # =====================================================================================================
@@ -541,20 +420,21 @@ def dataset_iid(dataset, num_users):
     return dict_users
 
 
-def multiprocessing_train_and_test(local, idx, net_glob_client, net_glob_server, w_locals_client, w_glob_server_buffer):
-    net_glob_client.to('cuda:' + str(idx))
-    net_glob_server.to('cuda:3')
-    # with torch.cuda.device(idx):
-    # Training ------------------
-    w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to('cuda:' + str(idx)))
-    # print('w_client type:', type(w_client))
-    # print(w_client.device.type)
-    w_locals_client.append(copy.deepcopy(w_client))
-
-    w_glob_server_buffer.append(copy.deepcopy(w_glob_server))
-
-    # Testing -------------------
-    # local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:'+str(idx)), ell=iter)
+def monitor_heartbeats(heartbeat_queue, num_users):
+    client_status = {i: 'idle' for i in range(num_users)}
+    while True:
+        try:
+            idx, status = heartbeat_queue.get(timeout=10)
+            if status == 'start':
+                client_status[idx] = 'running'
+            elif status == 'end':
+                client_status[idx] = 'idle'
+            print(f"Client {idx} status: {client_status[idx]}")
+        except Exception as e:
+            for idx in range(num_users):
+                if client_status[idx] == 'running':
+                    print(f"Client {idx} may have exited unexpectedly.")
+                    client_status[idx] = 'idle'
 
 
 if __name__ == '__main__':
@@ -590,11 +470,11 @@ if __name__ == '__main__':
     train_times = []
 
     net_glob_client = ResNet50_client_side()
+    net_glob_client = net_glob_client.to('cuda:0')  # 添加这一行将模型移动到 GPU
     print(net_glob_client)
 
-    # net_glob_server = manager.list()
-    # net_glob_server.append(ResNet18_server_side(Baseblock, [2, 2, 2], 100))
     net_glob_server = ResNet50_server_side(100)  # 7 is my numbr of classes
+    net_glob_server = net_glob_server.to('cuda:0')  # 添加这一行将模型移动到 GPU
     print(net_glob_server)
 
     # ===================================================================================
@@ -625,19 +505,12 @@ if __name__ == '__main__':
     l_epoch_check = False
     fed_check = False
 
-    # priority queue in server
-    priority_queue = manager.list()
-    BP_priority_queue = manager.list()
-    Server_FF_time_queue = manager.list()
-    Server_BP_time_queue = manager.list()
-    client_FF_time_queue = manager.list()
-    client_BP_time_queue = manager.list()
-    lock = manager.Lock()
+    # 添加心跳队列
+    heartbeat_queue = manager.Queue()
 
-    # Init all clients' BP time is 0
-    for i in range(num_users):
-        client_FF_time_queue.append(0)
-        client_BP_time_queue.append(0)
+    # 启动心跳监测进程
+    monitor_process = multiprocessing.Process(target=monitor_heartbeats, args=(heartbeat_queue, num_users))
+    monitor_process.start()
 
     # =============================================================================
     #                         Data preprocessing
@@ -656,8 +529,8 @@ if __name__ == '__main__':
         normalize,
     ])
 
-    train_directory = os.path.join('cifar-100-python', 'train1')
-    valid_directory = os.path.join('cifar-100-python', 'val')
+    train_directory = os.path.join('./data/cifar-100-python', 'train1')
+    valid_directory = os.path.join('./data/cifar-100-python', 'val')
     dataset_train = datasets.ImageFolder(root=train_directory, transform=train_transform)
     dataset_test = datasets.ImageFolder(root=valid_directory, transform=test_transform)
 
@@ -679,39 +552,26 @@ if __name__ == '__main__':
         idxs_users = np.random.choice(range(num_users), m, replace=False)
         w_locals_client = manager.list()
         w_glob_server_buffer = manager.list()
-        # net_glob_server.to('cpu')
-        processes = []
 
         for idx in idxs_users:
             local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
-                           priority_queue, BP_priority_queue,
-                           Server_FF_time_queue, Server_BP_time_queue, client_BP_time_queue, client_FF_time_queue,
-                           w_glob_server_buffer, lock, dataset_train=dataset_train,
-                           dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx])
-            process = multiprocessing.Process(target=multiprocessing_train_and_test, args=(
-            local, idx, net_glob_client, net_glob_server, w_locals_client, w_glob_server_buffer),
-                                              name="Client " + str(idx))
-            processes.append(process)
+                           dataset_train=dataset_train,
+                           dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
+                           heartbeat_queue=heartbeat_queue)
+            # Training ------------------
+            w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to('cuda:0'))
+            w_locals_client.append(copy.deepcopy(w_client))
+            w_glob_server_buffer.append(copy.deepcopy(w_glob_server))
 
-        # Start all clients for its local epochs------------
-        for p in processes:
-            p.start()
+            # Testing -------------------
+            local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
 
-        # After serving all clients for its local epochs------------
-        for p in processes:
-            p.join()
         idx_collect = manager.list()
         # Federation process at Client-Side------------------------
         print("------------------------------------------------------------")
         print("------ Fed Server: Federation process at Client-Side -------")
         print("------------------------------------------------------------")
-        # w_glob_client.to('CPU')
-        print(len(w_locals_client))
-        # print(net_glob_server.state_dict())
-        # print(w_locals_client[0])
 
-        # w_locals_client_copy = list(w_locals_client)
-        # w_glob_client = FedAvg(w_locals_client_copy.to('CPU'))
         w_glob_client = FedAvg(w_locals_client)
         w_glob_server = FedAvg(w_glob_server_buffer)
 
@@ -732,10 +592,10 @@ if __name__ == '__main__':
     print("Training and Evaluation completed!")
 
     # 确保输出目录存在
-    curve_dir = 'result/curve'
-    model_dir = 'result/model'
-    acc_dir = 'result/acc'
-    loss_dir = 'result/loss'
+    curve_dir = 'output/curve'
+    model_dir = 'output/model'
+    acc_dir = 'output/acc'
+    loss_dir = 'output/loss'
 
     for directory in [curve_dir, model_dir, acc_dir, loss_dir]:
         if not os.path.exists(directory):
@@ -754,9 +614,9 @@ if __name__ == '__main__':
 
     # 保存模型 命名为 模型名+当前时间
     client_model_filename = os.path.join(model_dir, 'PipeSFLV1_ResNet50_Cifar100_Client' + time.strftime("%Y%m%d%H%M%S",
-                                                                                                         time.localtime()) + '.pth')
+                                                                                                          time.localtime()) + '.pth')
     server_model_filename = os.path.join(model_dir, 'PipeSFLV1_ResNet50_Cifar100_Server' + time.strftime("%Y%m%d%H%M%S",
-                                                                                                         time.localtime()) + '.pth')
+                                                                                                          time.localtime()) + '.pth')
     torch.save(net_glob_client.state_dict(), client_model_filename)
     torch.save(net_glob_server.state_dict(), server_model_filename)
     print('Model saved successfully!')
@@ -774,7 +634,7 @@ if __name__ == '__main__':
 
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
     acc_train_filename = os.path.join(acc_dir, 'PipeSFLV1_ResNet50_Cifar100_Client_Acc' + time.strftime("%Y%m%d%H%M%S",
-                                                                                                        time.localtime()) + '.csv')
+                                                                                                         time.localtime()) + '.csv')
     acc_train_df.to_csv(acc_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
     loss_train_filename = os.path.join(loss_dir,
@@ -783,7 +643,7 @@ if __name__ == '__main__':
     loss_train_df.to_csv(loss_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
     acc_test_filename = os.path.join(acc_dir, 'PipeSFLV1_ResNet50_Cifar100_Server_Acc' + time.strftime("%Y%m%d%H%M%S",
-                                                                                                       time.localtime()) + '.csv')
+                                                                                                        time.localtime()) + '.csv')
     acc_test_df.to_csv(acc_test_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
     loss_test_filename = os.path.join(loss_dir,
@@ -792,8 +652,6 @@ if __name__ == '__main__':
     loss_test_df.to_csv(loss_test_filename, index=False)
     print('Data saved successfully!')
 
-    os.system('/root/upload.sh')
-
-    # =============================================================================
-    #                         Program Completed
-    # =============================================================================
+    # 结束心跳监测进程
+    monitor_process.terminate()
+    monitor_process.join()
