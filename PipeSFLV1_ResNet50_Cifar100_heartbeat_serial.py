@@ -145,7 +145,6 @@ def FedAvg(w):
         for i in range(1, len(w)):
             w_avg[k] += w[i][k]
         w_avg[k] = torch.div(w_avg[k], len(w))
-        w_avg[k] = w_avg[k].to('cuda:0')  # 添加这一行，确保权重在 GPU 上
     return w_avg
 
 
@@ -162,19 +161,13 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
                  idx_collect,
                  num_users):
     global l_epoch_check, fed_check
-    # global loss_train_collect, acc_train_collect
-    # global loss_train_collect_user, acc_train_collect_user
-    # print('idx_collect:', idx_collect)
-    # acc_avg_all_user_train = 0
-    # loss_avg_all_user_train = 0
-
+    net_glob_server = net_glob_server.to('cuda:0')  # 将模型移到 GPU 上
     net_glob_server.train()
     optimizer_server = torch.optim.Adam(net_glob_server.parameters(), lr=lr)
 
     # train and update
     optimizer_server.zero_grad()
 
-    # print('client_fx type:', type(fx_client))
     fx_client = fx_client
     fx_client = fx_client.requires_grad_(True)
     # print('client_fx type:', type(fx_client))
@@ -201,7 +194,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     # server-side model net_glob_server is global so it is updated automatically in each pass to this function
 
     # count1: to track the completion of the local batch associated with one client
-    # count1 += 1
+    count1 += 1
     # print('count1:', count1, '<===>len_batch:', len_batch)
     if count1 == len_batch:
         acc_avg_train = sum(batch_acc_train) / len(batch_acc_train)  # it has accuracy for one batch
@@ -241,16 +234,17 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
             # all users served for one round ------------------------- output print and update is done in evaluate_server()
             # for nicer display
 
-            idx_collect = []
+            # 确保列表中有数据再计算平均
+            if len(acc_train_collect_user) > 0:
+                acc_avg_all_user_train = sum(acc_train_collect_user) / len(acc_train_collect_user)
+                loss_avg_all_user_train = sum(loss_train_collect_user) / len(loss_train_collect_user)
+            else:
+                acc_avg_all_user_train = 0
+                loss_avg_all_user_train = 0
 
-            acc_avg_all_user_train = sum(acc_train_collect_user) / len(acc_train_collect_user)
-            loss_avg_all_user_train = sum(loss_train_collect_user) / len(loss_train_collect_user)
-
-            # loss_train_collect.append(loss_avg_all_user_train)
-            # acc_train_collect.append(acc_avg_all_user_train)
-
-            acc_train_collect_user = []
-            loss_train_collect_user = []
+            global acc_avg_all_user_train_global, loss_avg_all_user_train_global
+            acc_avg_all_user_train_global = acc_avg_all_user_train
+            loss_avg_all_user_train_global = loss_avg_all_user_train
 
     # send gradients to the client
     # server_result_queue.put(dfx_client.to('cuda:'+str(idx)))
@@ -259,9 +253,9 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
 # Server-side functions associated with Testing
 def evaluate_server(fx_client, y, idx, len_batch, ell):
     global net_glob_server, criterion, batch_acc_test, batch_loss_test
-    global loss_test_collect, acc_test_collect, count2, num_users, acc_avg_train_all, loss_avg_train_all, l_epoch_check, fed_check
-    global loss_test_collect_user, acc_test_collect_user, acc_avg_all_user_train, loss_avg_all_user_train
-
+    global loss_test_collect, acc_test_collect, count2, num_users, l_epoch_check, fed_check
+    global loss_test_collect_user, acc_test_collect_user, acc_avg_all_user_train_global, loss_avg_all_user_train_global
+    net_glob_server = net_glob_server.to('cuda:0')  # 将模型移到 GPU 上
     net_glob_server.eval()
 
     with torch.no_grad():
@@ -314,13 +308,17 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
                 loss_test_collect_user = []
 
                 print("====================== SERVER V1==========================")
-                print(' Train: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user_train,
-                                                                                          loss_avg_all_user_train))
+                print(' Train: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user_train_global,
+                                                                                          loss_avg_all_user_train_global))
                 print(' Test: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user,
                                                                                          loss_avg_all_user))
                 print("==========================================================")
 
     return
+
+# 在全局作用域中定义新的全局变量
+acc_avg_all_user_train_global = 0
+loss_avg_all_user_train_global = 0
 
 # ==============================================================================================================
 #                                       Clients Side Program
@@ -371,9 +369,16 @@ class Client(object):
                     images, labels = images.to('cuda:0'), labels.to('cuda:0')
 
                     optimizer_client.zero_grad()
+                    # ---------forward prop-------------
                     fx = net(images)
                     client_fx = fx.clone().detach()
 
+                    # transmit client_fx to server
+                    client_fx = client_fx.to('cuda:0')
+
+                    self.count1 = self.count1 + 1
+
+                    print('client ', self.idx, ' :', self.count1, '/', len_batch)
                     dfx, net_glob_server = train_server(client_fx, labels, iter, self.local_ep, self.idx,
                                                         len_batch, self.net_glob_server,
                                                         self.lr, self.criterion, self.batch_acc_train,
@@ -382,11 +387,11 @@ class Client(object):
                                                         self.acc_train_collect_user, self.idx_collect,
                                                         self.num_users)
 
-                    fx.backward(dfx.to('cuda:0'))
+                    fx.backward(dfx)
                     optimizer_client.step()
 
-            net = net.to('cuda:0')  # 添加这一行，确保模型在 GPU 上
-            net_glob_server = net_glob_server.to('cuda:0')  # 添加这一行，确保模型在 GPU 上
+            net.to('cpu')
+            net_glob_server.to('cpu')
             return net.state_dict(), net_glob_server.state_dict()
         finally:
             self.heartbeat_queue.put((self.idx, 'end'))
@@ -424,7 +429,7 @@ def monitor_heartbeats(heartbeat_queue, num_users):
     client_status = {i: 'idle' for i in range(num_users)}
     while True:
         try:
-            idx, status = heartbeat_queue.get(timeout=10)
+            idx, status = heartbeat_queue.get(timeout=100)
             if status == 'start':
                 client_status[idx] = 'running'
             elif status == 'end':
