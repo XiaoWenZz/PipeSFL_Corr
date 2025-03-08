@@ -21,6 +21,7 @@ import os
 from torchvision import datasets, models
 import multiprocessing
 import time
+import logging
 
 # import matplotlib
 # matplotlib.use('Agg')
@@ -29,6 +30,7 @@ import copy
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+logging.basicConfig(level=logging.INFO)
 
 
 # To print in color -------test/train of the client side
@@ -148,7 +150,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
                  batch_acc_train, batch_loss_train, count1, loss_train_collect_user, acc_train_collect_user,
                  idx_collect,
                  num_users, priority_queue, Server_FF_time_queue, BP_priority_queue, lock,
-                 loss_train_collect, acc_train_collect):  # 新增共享对象参数
+                 loss_train_collect, acc_train_collect, l_epoch_check, fed_check, acc_avg_all_user_train, loss_avg_all_user_train):  # 新增共享对象参数
     net_glob_server.train()
     optimizer_server = torch.optim.Adam(net_glob_server.parameters(), lr=lr)
 
@@ -182,18 +184,22 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     batch_loss_train.append(loss.item())
     batch_acc_train.append(acc.item())
 
-    if count1.value == len_batch:  # 使用 .value 获取共享值
+    if count1[idx] == len_batch:  # 使用 .value 获取共享值
         acc_avg_train = sum(batch_acc_train) / len(batch_acc_train)
         loss_avg_train = sum(batch_loss_train) / len(batch_loss_train)
 
         batch_acc_train[:] = []  # 清空列表
         batch_loss_train[:] = []
-        count1.value = 0  # 更新共享值
+        with lock:
+            count1[idx] = 0  # 更新共享值
 
         prRed('Client{} Train => Local Epoch: {} \tAcc: {:.3f} \tLoss: {:.4f}'.format(idx, l_epoch_count, acc_avg_train,
                                                                                       loss_avg_train))
 
+        print('l_epoch_count:', l_epoch_count)
         if l_epoch_count == l_epoch - 1:
+            l_epoch_check.value = True
+
             acc_avg_train_all = acc_avg_train
             loss_avg_train_all = loss_avg_train
 
@@ -201,14 +207,19 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
             acc_train_collect_user.append(acc_avg_train_all)
 
             if idx not in idx_collect:
-                idx_collect.append(idx)
+                with lock:
+                    idx_collect.append(idx)
 
         if len(idx_collect) == num_users:
-            acc_avg_all_user_train = sum(acc_train_collect_user) / len(acc_train_collect_user)
-            loss_avg_all_user_train = sum(loss_train_collect_user) / len(loss_train_collect_user)
 
-            loss_train_collect.append(loss_avg_all_user_train)
-            acc_train_collect.append(acc_avg_all_user_train)
+            fed_check.value = True
+
+            acc_avg_all_user_train.value = sum(acc_train_collect_user) / len(acc_train_collect_user)
+            loss_avg_all_user_train.value = sum(loss_train_collect_user) / len(loss_train_collect_user)
+
+            with lock:
+                loss_train_collect.append(loss_avg_all_user_train.value)
+                acc_train_collect.append(acc_avg_all_user_train.value)
 
             acc_train_collect_user[:] = []
             loss_train_collect_user[:] = []
@@ -220,7 +231,7 @@ def evaluate_server(net_glob_server, fx_client, y, idx, len_batch, ell,
                     criterion, batch_acc_test, batch_loss_test,
                     loss_test_collect, acc_test_collect, count2, num_users,
                     loss_test_collect_user, acc_test_collect_user,
-                    l_epoch_check, fed_check, acc_avg_all_user_train, loss_avg_all_user_train):  # 新增共享对象参数
+                    l_epoch_check, fed_check, acc_avg_all_user_train, loss_avg_all_user_train, lock):  # 新增共享对象参数
     net_glob_server = net_glob_server.to('cuda:' + str(idx))
     net_glob_server.eval()
 
@@ -235,29 +246,38 @@ def evaluate_server(net_glob_server, fx_client, y, idx, len_batch, ell,
         # calculate accuracy
         acc = calculate_accuracy(fx_server, y)
 
-        batch_loss_test.append(loss.item())
-        batch_acc_test.append(acc.item())
+        with lock:
+            batch_loss_test.append(loss.item())
+            batch_acc_test.append(acc.item())
 
-        count2.value += 1  # 更新共享值
-        if count2.value == len_batch:
+        count2[idx] += 1  # 更新共享值
+        if count2[idx] == len_batch:
             acc_avg_test = sum(batch_acc_test) / len(batch_acc_test)
             loss_avg_test = sum(batch_loss_test) / len(batch_loss_test)
 
-            batch_acc_test[:] = []  # 清空列表
-            batch_loss_test[:] = []
-            count2.value = 0
+            with lock:
+                batch_acc_test[:] = []  # 清空列表
+                batch_loss_test[:] = []
+                count2[idx] = 0
 
             print('Client{} Test =>                   \tAcc: {:.3f} \tLoss: {:.4f}'.format(idx, acc_avg_test,
                                                                                            loss_avg_test))
 
-            if l_epoch_check:
-                l_epoch_check = False
+            # for debugging
+            print('l_epoch_check:', l_epoch_check.value)
+
+            if l_epoch_check.value:
+                l_epoch_check.value = False
 
                 acc_avg_test_all = acc_avg_test
                 loss_avg_test_all = loss_avg_test
 
-                loss_test_collect_user.append(loss_avg_test_all)
-                acc_test_collect_user.append(acc_avg_test_all)
+                with lock:
+                    loss_test_collect_user.append(loss_avg_test_all)
+                    acc_test_collect_user.append(acc_avg_test_all)
+
+            # for debugging
+            print('fed_check:', fed_check.value)
 
             if fed_check.value:
                 fed_check.value = False
@@ -265,14 +285,33 @@ def evaluate_server(net_glob_server, fx_client, y, idx, len_batch, ell,
                 acc_avg_all_user = sum(acc_test_collect_user) / len(acc_test_collect_user)
                 loss_avg_all_user = sum(loss_test_collect_user) / len(loss_test_collect_user)
 
-                loss_test_collect.append(loss_avg_all_user)
-                acc_test_collect.append(acc_avg_all_user)
-                acc_test_collect_user[:] = []
-                loss_test_collect_user[:] = []
+                with lock:
+                    loss_test_collect.append(loss_avg_all_user)
+                    acc_test_collect.append(acc_avg_all_user)
+                    acc_test_collect_user[:] = []
+                    loss_test_collect_user[:] = []
+
+                # 检查 ell 的类型
+                if not isinstance(ell, int):
+                    logging.error(f"ell 的类型为 {type(ell)}，期望为 int 类型")
+                else:
+                    logging.info(f"ell 的类型为 {type(ell)}")
+
+                # 检查 acc_avg_all_user_train 的类型
+                if not isinstance(acc_avg_all_user_train.value, float):
+                    logging.error(f"acc_avg_all_user_train 的类型为 {type(acc_avg_all_user_train.value)}，期望为 float 类型")
+                else:
+                    logging.info(f"acc_avg_all_user_train 的类型为 {type(acc_avg_all_user_train.value)}")
+
+                # 检查 loss_avg_all_user_train 的类型
+                if not isinstance(loss_avg_all_user_train.value, float):
+                    logging.error(f"loss_avg_all_user_train 的类型为 {type(loss_avg_all_user_train.value)}，期望为 float 类型")
+                else:
+                    logging.info(f"loss_avg_all_user_train 的类型为 {type(loss_avg_all_user_train.value)}")
 
                 print("====================== SERVER V1==========================")
-                print(' Train: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user_train,
-                                                                                          loss_avg_all_user_train))
+                print(' Train: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user_train.value,
+                                                                                          loss_avg_all_user_train.value))
                 print(' Test: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user,
                                                                                          loss_avg_all_user))
                 print("==========================================================")
@@ -361,7 +400,7 @@ class Client(object):
                     del self.client_FF_time_queue[self.idx]
                     self.client_FF_time_queue.insert(self.idx, time.time() - FF_start_time)
 
-                    self.count1.value = self.count1.value + 1
+                    self.count1[self.idx] = self.count1[self.idx] + 1
 
                     # insert new tasks
                     if len(self.BP_priority_queue) == len(self.priority_queue):
@@ -383,7 +422,7 @@ class Client(object):
                                         self.Server_BP_time_queue[t]:
                                     self.BP_priority_queue.insert(t, self.idx)
                                     self.Server_BP_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                     self.client_BP_time_queue[self.idx])
+                                                                    self.client_BP_time_queue[self.idx])
                                     break
                                 elif t == len(self.BP_priority_queue) - 1:
                                     self.BP_priority_queue.append(self.idx)
@@ -400,7 +439,7 @@ class Client(object):
                                         self.Server_FF_time_queue[t]:
                                     self.priority_queue.insert(t, self.idx)
                                     self.Server_FF_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                     self.client_BP_time_queue[self.idx])
+                                                                    self.client_BP_time_queue[self.idx])
                                     break
                                 elif t == len(self.priority_queue) - 1:
                                     self.priority_queue.append(self.idx)
@@ -417,7 +456,7 @@ class Client(object):
                                         self.Server_BP_time_queue[t]:
                                     self.BP_priority_queue.insert(t, self.idx)
                                     self.Server_BP_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                     self.client_BP_time_queue[self.idx])
+                                                                    self.client_BP_time_queue[self.idx])
                                     break
                                 elif t == len(self.BP_priority_queue) - 1:
                                     self.BP_priority_queue.append(self.idx)
@@ -434,7 +473,7 @@ class Client(object):
                                         self.Server_FF_time_queue[t]:
                                     self.priority_queue.insert(t, self.idx)
                                     self.Server_FF_time_queue.insert(t, self.client_FF_time_queue[self.idx] +
-                                                                     self.client_BP_time_queue[self.idx])
+                                                                    self.client_BP_time_queue[self.idx])
                                     break
                                 elif t == len(self.priority_queue) - 1:
                                     self.priority_queue.append(self.idx)
@@ -442,12 +481,13 @@ class Client(object):
                                         self.client_FF_time_queue[self.idx] + self.client_BP_time_queue[self.idx])
 
                 # Client idx's task is started in Server when it has the highest priority
-                # print('priority_queue:', self.priority_queue)
+                # print client's priority queue
+                # print('client ', self.idx, 'priority_queue:', self.priority_queue)
                 while True:
                     if len(self.priority_queue) >= 1:
                         if self.priority_queue[0] == self.idx:
                             # Sending activations to server and receiving gradients from server
-                            print('client ', self.idx, ' :', self.count1.value, '/', len_batch)
+                            print('client ', self.idx, ' :', self.count1[self.idx], '/', len_batch)
                             dfx, net_glob_server = train_server(client_fx, labels, iter, self.local_ep, self.idx,
                                                                 len_batch, self.net_glob_server,
                                                                 self.lr, self.criterion, self.batch_acc_train,
@@ -456,7 +496,7 @@ class Client(object):
                                                                 self.acc_train_collect_user, self.idx_collect,
                                                                 self.num_users, self.priority_queue,
                                                                 self.Server_FF_time_queue, self.BP_priority_queue,
-                                                                self.lock, loss_train_collect, acc_train_collect)
+                                                                self.lock, loss_train_collect, acc_train_collect, self.l_epoch_check, self.fed_check, self.acc_avg_all_user_train, self.loss_avg_all_user_train)
 
                             with self.lock:
                                 del self.BP_priority_queue[0]
@@ -489,7 +529,7 @@ class Client(object):
                 fx = net(images)
 
                 # Sending activations to server
-                evaluate_server(net_glob_server, fx, labels, self.idx, len_batch, ell, self.criterion, self.batch_acc_train, self.batch_loss_train, self.loss_test_collect, self.acc_test_collect, self.count2, self.num_users, self.loss_test_collect_user, self.acc_test_collect_user, self.l_epoch_check, self.fed_check, self.acc_avg_all_user_train, self.loss_avg_all_user_train)
+                evaluate_server(net_glob_server, fx, labels, self.idx, len_batch, ell, self.criterion, self.batch_acc_train, self.batch_loss_train, self.loss_test_collect, self.acc_test_collect, self.count2, self.num_users, self.loss_test_collect_user, self.acc_test_collect_user, self.l_epoch_check, self.fed_check, self.acc_avg_all_user_train, self.loss_avg_all_user_train, self.lock)
 
             # prRed('Client{} Test => Epoch: {}'.format(self.idx, ell))
 
@@ -509,7 +549,7 @@ def dataset_iid(dataset, num_users):
 
 
 def multiprocessing_train_and_test(local, idx, net_glob_client, net_glob_server, w_locals_client, w_glob_server_buffer,
-                                   loss_train_collect, acc_train_collect):
+                                   loss_train_collect, acc_train_collect, iter):
                                    # loss_test_collect, acc_test_collect,
                                    # batch_acc_test, batch_loss_test,
                                    # count1, count2,
@@ -597,8 +637,13 @@ if __name__ == '__main__':
     batch_loss_test = manager.list()
 
     criterion = nn.CrossEntropyLoss()
-    count1 = manager.Value('i', 0)
-    count2 = manager.Value('i', 0)
+    # count1 = manager.Value('i', 0)
+    # count2 = manager.Value('i', 0)
+    count1 = manager.list()
+    count2 = manager.list()
+    for i in range(num_users):
+        count1.append(0)
+        count2.append(0)
 
     # to print train - test together in each round-- these are made global
     # acc_avg_all_user_train = 0
@@ -607,12 +652,12 @@ if __name__ == '__main__':
     # acc_train_collect_user = manager.list()
     loss_test_collect_user = manager.list()
     acc_test_collect_user = manager.list()
-    acc_avg_all_user_train = manager.list()
-    loss_avg_all_user_train = manager.list()
+    acc_avg_all_user_train = manager.Value('f', 0)
+    loss_avg_all_user_train = manager.Value('f', 0)
 
     # client idx collector
     idx_collect = manager.list()
-    l_epoch_check = False
+    l_epoch_check = manager.Value('b', False)
     fed_check = manager.Value('b', False)
 
     # priority queue in server
@@ -683,7 +728,7 @@ if __name__ == '__main__':
                            acc_avg_all_user_train=acc_avg_all_user_train, loss_avg_all_user_train=loss_avg_all_user_train)
             process = multiprocessing.Process(target=multiprocessing_train_and_test, args=(
                 local, idx, net_glob_client, net_glob_server, w_locals_client, w_glob_server_buffer,
-                loss_train_collect, acc_train_collect,
+                loss_train_collect, acc_train_collect, iter
                 # loss_test_collect, acc_test_collect,
                 # batch_acc_test, batch_loss_test,
                 # count1, count2,
