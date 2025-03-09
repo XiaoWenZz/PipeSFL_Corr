@@ -291,23 +291,23 @@ def evaluate_server(net_glob_server, fx_client, y, idx, len_batch, ell,
                     acc_test_collect_user[:] = []
                     loss_test_collect_user[:] = []
 
-                # 检查 ell 的类型
-                if not isinstance(ell, int):
-                    logging.error(f"ell 的类型为 {type(ell)}，期望为 int 类型")
-                else:
-                    logging.info(f"ell 的类型为 {type(ell)}")
-
-                # 检查 acc_avg_all_user_train 的类型
-                if not isinstance(acc_avg_all_user_train.value, float):
-                    logging.error(f"acc_avg_all_user_train 的类型为 {type(acc_avg_all_user_train.value)}，期望为 float 类型")
-                else:
-                    logging.info(f"acc_avg_all_user_train 的类型为 {type(acc_avg_all_user_train.value)}")
-
-                # 检查 loss_avg_all_user_train 的类型
-                if not isinstance(loss_avg_all_user_train.value, float):
-                    logging.error(f"loss_avg_all_user_train 的类型为 {type(loss_avg_all_user_train.value)}，期望为 float 类型")
-                else:
-                    logging.info(f"loss_avg_all_user_train 的类型为 {type(loss_avg_all_user_train.value)}")
+                # # 检查 ell 的类型
+                # if not isinstance(ell, int):
+                #     logging.error(f"ell 的类型为 {type(ell)}，期望为 int 类型")
+                # else:
+                #     logging.info(f"ell 的类型为 {type(ell)}")
+                #
+                # # 检查 acc_avg_all_user_train 的类型
+                # if not isinstance(acc_avg_all_user_train.value, float):
+                #     logging.error(f"acc_avg_all_user_train 的类型为 {type(acc_avg_all_user_train.value)}，期望为 float 类型")
+                # else:
+                #     logging.info(f"acc_avg_all_user_train 的类型为 {type(acc_avg_all_user_train.value)}")
+                #
+                # # 检查 loss_avg_all_user_train 的类型
+                # if not isinstance(loss_avg_all_user_train.value, float):
+                #     logging.error(f"loss_avg_all_user_train 的类型为 {type(loss_avg_all_user_train.value)}，期望为 float 类型")
+                # else:
+                #     logging.info(f"loss_avg_all_user_train 的类型为 {type(loss_avg_all_user_train.value)}")
 
                 print("====================== SERVER V1==========================")
                 print(' Train: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user_train.value,
