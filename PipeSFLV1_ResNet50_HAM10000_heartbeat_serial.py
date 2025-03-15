@@ -357,8 +357,8 @@ class Client(object):
         self.idx_collect = idx_collect
         self.num_users = num_users
         # self.selected_clients = []
-        self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size=32, shuffle=True)
-        self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size=32, shuffle=True)
+        self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size=256, shuffle=True)
+        self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size=256, shuffle=True)
 
     def train(self, net):
         try:
@@ -554,7 +554,7 @@ if __name__ == '__main__':
             return len(self.df)
 
         def __getitem__(self, index):
-            X = Image.open(self.df['path'][index]).resize((224, 224))
+            X = Image.open(self.df['path'][index]).resize((64, 64))
             y = torch.tensor(int(self.df['target'][index]))
 
             if self.transform:
@@ -571,14 +571,14 @@ if __name__ == '__main__':
         transforms.RandomVerticalFlip(),
         transforms.Pad(3),
         transforms.RandomRotation(10),
-        transforms.CenterCrop(224),
+        transforms.CenterCrop(64),
         transforms.ToTensor(),
         transforms.Normalize(mean=mean, std=std)
     ])
 
     test_transforms = transforms.Compose([
         transforms.Pad(3),
-        transforms.CenterCrop(224),
+        transforms.CenterCrop(64),
         transforms.ToTensor(),
         transforms.Normalize(mean=mean, std=std)
     ])
