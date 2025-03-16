@@ -1,3 +1,4 @@
+import queue
 import threading
 
 from matplotlib import pyplot as plt
@@ -407,8 +408,20 @@ class Client(object):
                 optimizer_client = torch.optim.Adam(net.parameters(), lr=self.lr)
 
                 for iter in range(self.local_ep):
+
+                    # 检查是否断开连接
+                    if self.is_disconnected:
+                        print(f"[Abort] Client{self.idx} 训练期间断开，终止训练")
+                        break
                     len_batch = len(self.ldr_train)
+
                     for batch_idx, (images, labels) in enumerate(self.ldr_train):
+
+                        # 检查是否断开连接
+                        if self.is_disconnected:
+                            print(f"[Abort] Client{self.idx} 训练期间断开，终止训练")
+                            break
+
                         images, labels = images.to('cuda:0'), labels.to('cuda:0')
 
                         optimizer_client.zero_grad()
@@ -451,6 +464,12 @@ class Client(object):
                 with torch.no_grad():
                     len_batch = len(self.ldr_test)
                     for batch_idx, (images, labels) in enumerate(self.ldr_test):
+
+                        # 检查客户端是否断开连接
+                        if self.is_disconnected:
+                            print(f"[Abort] Client{self.idx} 测试期间断开，终止测试")
+                            break
+
                         images, labels = images.to('cuda:0'), labels.to('cuda:0')
                         fx = net(images)
 
@@ -479,14 +498,13 @@ def monitor_heartbeats(heartbeat_queue, num_users):
             idx, status, timestamp = heartbeat_queue.get(timeout=15)
             client_status[idx] = {"status": status, "last_heartbeat": timestamp, "type": "normal" if status != "disconnected" else "disconnected"}
             print(f"[Heartbeat] Client {idx}: {status} - Last: {timestamp} - ({client_status[idx]['type']})")
-            time.sleep(3)
 
             # 检查超时（超过3倍间隔未收到心跳）
             # if (time.time() - time.mktime(
             #         time.strptime(client_status[idx]["last_heartbeat"], "%Y-%m-%d %H:%M:%S"))) > 3 * 10:
             #     print(f"[Warning] Client {idx} may be disconnected!")
 
-        except Exception as e:
+        except queue.Empty:
             # 处理意外退出
             for idx in range(num_users):
                 # if client_status[idx]["status"] in ["training", "testing"]:
@@ -495,6 +513,9 @@ def monitor_heartbeats(heartbeat_queue, num_users):
                 if client_status[idx]["type"] !=  "disconnected" and client_status[idx]["status"] in ["training", "testing"]:
                     print(f"[Error] Client {idx} exited unexpectedly!")
                     client_status[idx] = {"status": "idle", "last_heartbeat": "", "type": "disconnected"}
+
+        except Exception as e:
+            print(f"[Error] An unexpected error occurred: {e}")
 
 if __name__ == '__main__':
     torch.cuda.init()
@@ -670,15 +691,16 @@ if __name__ == '__main__':
                            dataset_train=dataset_train,
                            dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
                            heartbeat_queue=heartbeat_queue, disconnect_prob=0.01)
+
+            # Training ------------------
+            w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to('cuda:0'))
+
             if local.is_disconnected:
-                print(f"[Skip] Client{local.idx} 断开，跳过训练和测试")
+                prRed(f"Client{idx} 断开连接，跳过训练, 不参与联邦学习")
                 continue
             else:
-                # Training ------------------
-                w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to('cuda:0'))
                 w_locals_client.append(copy.deepcopy(w_client))
                 w_glob_server_buffer.append(copy.deepcopy(w_glob_server))
-
                 # Testing -------------------
                 local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
 
