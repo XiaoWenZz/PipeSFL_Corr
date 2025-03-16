@@ -142,6 +142,7 @@ class ResNet50_server_side(nn.Module):
 # ====================================================================================================
 # Federated averaging: FedAvg
 def FedAvg(w):
+    print('len(w):', len(w))
     w_avg = copy.deepcopy(w[0])
     for k in w_avg.keys():
         for i in range(1, len(w)):
@@ -373,23 +374,21 @@ class Client(object):
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
         self.heartbeat_thread.start()
 
-    def check_disconnect(self):
-        """每个epoch开始时调用，随机决定是否断开"""
-        self.is_disconnected = random.random() < self.disconnect_prob
-        if self.is_disconnected:
-            print(f"[Disconnect] Client{self.idx} 本轮断开 (概率{self.disconnect_prob * 100}%)")
-        else:
-            self.is_disconnected = False
-
     def send_heartbeat(self):
-        """独立心跳线程，定时发送状态"""
-        if self.is_disconnected:
-            return
-        else:
-            while True:
-                timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-                self.heartbeat_queue.put((self.idx, self.status, timestamp))
+        while True:
+            if not self.is_disconnected:
+                # 仅在未断开时检查是否断开
+                self.is_disconnected = random.random() < self.disconnect_prob
+                if self.is_disconnected:
+                    print(f"[Disconnect] Client{self.idx} 断开 (概率{self.disconnect_prob * 100}%)")
+            if self.is_disconnected:
+                # 断开后持续休眠，不再尝试连接
                 time.sleep(self.heartbeat_interval)
+                continue
+
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            self.heartbeat_queue.put((self.idx, self.status, timestamp))
+            time.sleep(self.heartbeat_interval)
 
     def train(self, net):
         if self.is_disconnected:
@@ -662,7 +661,6 @@ if __name__ == '__main__':
                            dataset_train=dataset_train,
                            dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
                            heartbeat_queue=heartbeat_queue, disconnect_prob=0.4)
-            local.check_disconnect()
             if local.is_disconnected:
                 print(f"[Skip] Client{local.idx} 断开，跳过训练和测试")
                 continue
