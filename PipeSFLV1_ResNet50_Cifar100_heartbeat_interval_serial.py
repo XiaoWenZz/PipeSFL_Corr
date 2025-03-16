@@ -381,6 +381,11 @@ class Client(object):
                 self.is_disconnected = random.random() < self.disconnect_prob
                 if self.is_disconnected:
                     print(f"[Disconnect] Client{self.idx} 断开 (概率{self.disconnect_prob * 100}%)")
+                    # 发送断开信号后休眠
+                    self.heartbeat_queue.put((self.idx, "disconnected", time.strftime("%Y-%m-%d %H:%M:%S")))
+                    time.sleep(self.heartbeat_interval)
+                    continue
+
             if self.is_disconnected:
                 # 断开后持续休眠，不再尝试连接
                 time.sleep(self.heartbeat_interval)
@@ -468,25 +473,28 @@ def dataset_iid(dataset, num_users):
 
 
 def monitor_heartbeats(heartbeat_queue, num_users):
-    client_status = {i: {"status": "idle", "last_heartbeat": ""} for i in range(num_users)}
+    client_status = {i: {"status": "idle", "last_heartbeat": "", "type": "normal"} for i in range(num_users)}
     while True:
         try:
             idx, status, timestamp = heartbeat_queue.get(timeout=15)
-            client_status[idx] = {"status": status, "last_heartbeat": timestamp}
-            print(f"[Heartbeat] Client {idx}: {status} - Last: {timestamp}")
+            client_status[idx] = {"status": status, "last_heartbeat": timestamp, "type": "normal" if status != "disconnected" else "disconnected"}
+            print(f"[Heartbeat] Client {idx}: {status} - Last: {timestamp} - ({client_status[idx]['type']})")
             time.sleep(3)
 
             # 检查超时（超过3倍间隔未收到心跳）
-            if (time.time() - time.mktime(
-                    time.strptime(client_status[idx]["last_heartbeat"], "%Y-%m-%d %H:%M:%S"))) > 3 * 10:
-                print(f"[Warning] Client {idx} may be disconnected!")
+            # if (time.time() - time.mktime(
+            #         time.strptime(client_status[idx]["last_heartbeat"], "%Y-%m-%d %H:%M:%S"))) > 3 * 10:
+            #     print(f"[Warning] Client {idx} may be disconnected!")
+
         except Exception as e:
             # 处理意外退出
             for idx in range(num_users):
-                if client_status[idx]["status"] in ["training", "testing"]:
+                # if client_status[idx]["status"] in ["training", "testing"]:
+                #     print(f"[Error] Client {idx} exited unexpectedly!")
+                #     client_status[idx] = {"status": "idle", "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S")}
+                if client_status[idx]["type"] !=  "disconnected" and client_status[idx]["status"] in ["training", "testing"]:
                     print(f"[Error] Client {idx} exited unexpectedly!")
-                    client_status[idx] = {"status": "idle", "last_heartbeat": time.strftime("%Y-%m-%d %H:%M:%S")}
-
+                    client_status[idx] = {"status": "idle", "last_heartbeat": "", "type": "disconnected"}
 
 if __name__ == '__main__':
     torch.cuda.init()
