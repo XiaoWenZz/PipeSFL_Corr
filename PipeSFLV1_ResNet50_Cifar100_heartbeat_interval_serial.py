@@ -369,7 +369,7 @@ class Client(object):
 
         # 新增心跳管理
         self.status = "idle"  # idle, training, testing
-        self.heartbeat_interval = 5  # 5秒心跳间隔
+        self.heartbeat_interval = 10  # 10秒心跳间隔
         # 心跳线程在初始化最后启动（确保属性已创建）
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
         self.heartbeat_thread.start()
@@ -660,7 +660,7 @@ if __name__ == '__main__':
             local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
                            dataset_train=dataset_train,
                            dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
-                           heartbeat_queue=heartbeat_queue, disconnect_prob=0.4)
+                           heartbeat_queue=heartbeat_queue, disconnect_prob=0.01)
             if local.is_disconnected:
                 print(f"[Skip] Client{local.idx} 断开，跳过训练和测试")
                 continue
@@ -679,14 +679,17 @@ if __name__ == '__main__':
         print("------ Fed Server: Federation process at Client-Side -------")
         print("------------------------------------------------------------")
 
-        w_glob_client = FedAvg(w_locals_client)
-        w_glob_server = FedAvg(w_glob_server_buffer)
+        if len(w_locals_client) == 0:
+            print("No clients available for Federated Learning!")
+        else:
+            w_glob_client = FedAvg(w_locals_client)
+            w_glob_server = FedAvg(w_glob_server_buffer)
 
-        # Update client-side global model
-        net_glob_client.load_state_dict(w_glob_client)
+            # Update client-side global model
+            net_glob_client.load_state_dict(w_glob_client)
 
-        # Update server-side global model
-        net_glob_server.load_state_dict(w_glob_server)
+            # Update server-side global model
+            net_glob_server.load_state_dict(w_glob_server)
 
         train_time = time.time() - start_time  # 新增：计算当前轮次的训练时间
         train_times.append(train_time)  # 新增：将当前轮次的训练时间添加到列表中
