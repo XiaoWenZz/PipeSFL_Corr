@@ -370,9 +370,8 @@ class DatasetSplit(Dataset):
 
 # Client-side functions associated with Training and Testing
 class Client(object):
-    def __init__(self, net_client_model, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
-                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.01, idx_disconnected=None,
-                 running = True):
+    def __init__(self, net_client_model, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users, running,
+                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.001, idx_disconnected=None):
         self.disconnect_prob = disconnect_prob  # 断开概率
         self.is_disconnected = False  # 是否已断开
         self.heartbeat_queue = heartbeat_queue
@@ -403,7 +402,7 @@ class Client(object):
         self.heartbeat_thread.start()
 
     def send_heartbeat(self):
-        while self.running:
+        while self.running.value:
             if not self.is_disconnected:
                 # 仅在未断开时检查是否断开
                 random_num = numpy.random.random()
@@ -442,7 +441,6 @@ class Client(object):
         else:
             try:
                 self.status = "training"  # 更新状态
-                self.status = "training"
                 net = net.to('cuda:0')  # 显式移到 GPU
                 self.net_glob_server = self.net_glob_server.to('cuda:0')
                 net.train()
@@ -742,7 +740,7 @@ if __name__ == '__main__':
             local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
                            dataset_train=dataset_train,
                            dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
-                           heartbeat_queue=heartbeat_queue, disconnect_prob=0.01, idx_disconnected=idx_disconnected, running=running)
+                           heartbeat_queue=heartbeat_queue, disconnect_prob=0.001, idx_disconnected=idx_disconnected, running=running)
 
             # Training ------------------
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
@@ -768,6 +766,7 @@ if __name__ == '__main__':
                 local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
 
         idx_collect = manager.list()
+        idx_disconnected = manager.list()
         # Federation process at Client-Side------------------------
         print("------------------------------------------------------------")
         print("------ Fed Server: Federation process at Client-Side -------")
