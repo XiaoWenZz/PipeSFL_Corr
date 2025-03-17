@@ -142,16 +142,28 @@ class ResNet50_server_side(nn.Module):
 #                                  Server Side Programs
 # ====================================================================================================
 # Federated averaging: FedAvg
-def FedAvg(w, corrections):
-    print('len(w):', len(w))
-    if not w:  # 无有效客户端时返回空
+def FedAvg(w, corrections, model_type):
+    """
+    model_type: 'client' 或 'server'，用于选择对应参数键
+    """
+    if not w:
         return {}
-    w_avg = copy.deepcopy(w[0])
-    for k in w_avg.keys():
+
+    # 根据模型类型获取基准参数
+    if model_type == 'client':
+        w_avg = copy.deepcopy(w[0])
+        param_keys = net_glob_client.state_dict().keys()
+    elif model_type == 'server':
+        w_avg = copy.deepcopy(w[0])
+        param_keys = net_glob_server.state_dict().keys()
+    else:
+        raise ValueError("Invalid model_type")
+
+    for k in param_keys:
         total = w_avg[k].clone()
         for i, params in enumerate(w):
-            corr = corrections.get(i, {k: torch.zeros_like(params[k])})[k]
-            # 显式移到 CPU（防御性编程）
+            # 防御性编程：确保参数在corrections中存在
+            corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
             total += params[k].cpu() + corr.cpu()
         w_avg[k] = total / len(w)
     return w_avg
@@ -606,7 +618,10 @@ if __name__ == '__main__':
     monitor_process.start()
 
     # 初始化校正变量
-    server_corrections = {i: {k: torch.zeros_like(v) for k, v in net_glob_client.state_dict().items()} for i in range(num_users)}
+    client_corrections = {i: {k: torch.zeros_like(v) for k, v in net_glob_client.state_dict().items()} for i in
+                          range(num_users)}
+    server_corrections = {i: {k: torch.zeros_like(v) for k, v in net_glob_server.state_dict().items()} for i in
+                          range(num_users)}
 
     # =============================================================================
     #                         Data preprocessing
@@ -718,10 +733,15 @@ if __name__ == '__main__':
                 w_locals_client.append(w_client)  # 已在 CPU
                 w_glob_server_buffer.append(w_glob_server)  # 已在 CPU
 
-                # 更新校正变量
-                global_update = net_glob_client.state_dict()
-                for k in global_update.keys():
-                    server_corrections[idx][k] = global_update[k] - w_client[k]
+                # 客户端训练后，更新客户端校正项（原逻辑）
+                global_update_client = net_glob_client.state_dict()
+                for k in global_update_client.keys():
+                    client_corrections[idx][k] = global_update_client[k] - w_client[k]
+
+                # 服务器端训练后（需新增逻辑），更新服务器端校正项
+                global_update_server = net_glob_server.state_dict()
+                for k in global_update_server.keys():
+                    server_corrections[idx][k] = global_update_server[k] - w_glob_server[k]
 
                 # Testing -------------------
                 local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
@@ -735,8 +755,11 @@ if __name__ == '__main__':
         if len(w_locals_client) == 0:
             print("No clients available for Federated Learning!")
         else:
-            w_glob_client = FedAvg(w_locals_client, server_corrections)
-            w_glob_server = FedAvg(w_glob_server_buffer, server_corrections)
+            # 客户端联邦平均
+            w_glob_client = FedAvg(w_locals_client, client_corrections, model_type='client')
+
+            # 服务器端联邦平均
+            w_glob_server = FedAvg(w_glob_server_buffer, server_corrections, model_type='server')
 
             # Update client-side global model
             net_glob_client.load_state_dict(w_glob_client)
