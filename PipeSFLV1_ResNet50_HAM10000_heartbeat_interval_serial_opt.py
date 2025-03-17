@@ -250,9 +250,9 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
                 idx_collect.append(idx)
                 # print(idx_collect)
 
-            # for debugging print idxes of idx_collect and idx_disconnected
-            print(f"[Debug] idx_collect: {idx_collect}")
-            print(f"[Debug] idx_disconnected: {idx_disconnected}")
+        # for debugging print idxes of idx_collect and idx_disconnected
+        print(f"[Debug] idx_collect: {idx_collect}")
+        print(f"[Debug] idx_disconnected: {idx_disconnected}")
 
         # This is to check if all users are served for one round --------------------
         if len(idx_collect) + len(idx_disconnected) == num_users:
@@ -371,7 +371,8 @@ class DatasetSplit(Dataset):
 # Client-side functions associated with Training and Testing
 class Client(object):
     def __init__(self, net_client_model, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
-                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.01, idx_disconnected=None):
+                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.01, idx_disconnected=None,
+                 running = True):
         self.disconnect_prob = disconnect_prob  # 断开概率
         self.is_disconnected = False  # 是否已断开
         self.heartbeat_queue = heartbeat_queue
@@ -393,6 +394,7 @@ class Client(object):
         self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size=256, shuffle=True)
 
         self.idx_disconnected = idx_disconnected
+        self.running = running
         # 新增心跳管理
         self.status = "idle"  # idle, training, testing
         self.heartbeat_interval = 5  # 5秒心跳间隔
@@ -401,7 +403,7 @@ class Client(object):
         self.heartbeat_thread.start()
 
     def send_heartbeat(self):
-        while True:
+        while self.running:
             if not self.is_disconnected:
                 # 仅在未断开时检查是否断开
                 random_num = numpy.random.random()
@@ -428,6 +430,9 @@ class Client(object):
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
             self.heartbeat_queue.put((self.idx, self.status, timestamp))
             time.sleep(self.heartbeat_interval)
+
+        # 线程结束，打印退出信息
+        print(f"[Info] Client{self.idx} 心跳线程结束")
 
     def train(self, net):
         if self.is_disconnected:
@@ -562,6 +567,7 @@ if __name__ == '__main__':
     torch.cuda.init()
     torch.multiprocessing.set_start_method("spawn", force=True)
     manager = multiprocessing.Manager()
+    running = manager.Value('b', True)
 
     SEED = 1234
     random.seed(SEED)
@@ -736,7 +742,7 @@ if __name__ == '__main__':
             local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
                            dataset_train=dataset_train,
                            dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
-                           heartbeat_queue=heartbeat_queue, disconnect_prob=0.01, idx_disconnected=idx_disconnected)
+                           heartbeat_queue=heartbeat_queue, disconnect_prob=0.01, idx_disconnected=idx_disconnected, running=running)
 
             # Training ------------------
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
@@ -877,6 +883,8 @@ if __name__ == '__main__':
                                        'loss_curve' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
     plt.savefig(loss_curve_filename)
     print('Data saved successfully!')
+
+    running = False
 
     # 结束心跳监测进程
     monitor_process.terminate()
