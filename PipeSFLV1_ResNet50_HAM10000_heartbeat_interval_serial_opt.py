@@ -1,6 +1,7 @@
 import queue
 import threading
 
+import numpy.random
 from matplotlib import pyplot as plt
 # =============================================================================
 # SplitfedV2 (SFLV2) learning: ResNet18 on HAM10000
@@ -398,7 +399,7 @@ class Client(object):
         while True:
             if not self.is_disconnected:
                 # 仅在未断开时检查是否断开
-                random_num = random.random()
+                random_num = numpy.random.random()
                 self.is_disconnected = random_num < self.disconnect_prob and self.status != "idle"
                 if self.is_disconnected:
                     # for debugging print random number
