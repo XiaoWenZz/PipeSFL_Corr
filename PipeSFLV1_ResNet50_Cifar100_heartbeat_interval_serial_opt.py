@@ -151,7 +151,8 @@ def FedAvg(w, corrections):
         total = w_avg[k].clone()
         for i, params in enumerate(w):
             corr = corrections.get(i, {k: torch.zeros_like(params[k])})[k]
-            total += params[k] + corr
+            # 显式移到 CPU（防御性编程）
+            total += params[k].cpu() + corr.cpu()
         w_avg[k] = total / len(w)
     return w_avg
 
@@ -563,12 +564,10 @@ if __name__ == '__main__':
     lr = 0.0001
     train_times = []
 
-    net_glob_client = ResNet50_client_side()
-    net_glob_client = net_glob_client.to('cuda:0')  # 添加这一行将模型移动到 GPU
+    net_glob_client = ResNet50_client_side().cpu()
     print(net_glob_client)
 
-    net_glob_server = ResNet50_server_side(7)  # 7 是 HAM10000 的类别数
-    net_glob_server = net_glob_server.to('cuda:0')  # 添加这一行将模型移动到 GPU
+    net_glob_server = ResNet50_server_side(7).cpu()
     print(net_glob_server)
 
     # ===================================================================================
@@ -710,17 +709,14 @@ if __name__ == '__main__':
                            heartbeat_queue=heartbeat_queue, disconnect_prob=0.01)
 
             # Training ------------------
-            w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to('cuda:0'))
+            w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
 
             if local.is_disconnected:
                 prRed(f"Client{idx} 断开连接，使用校正变量模拟更新")
-                if idx in server_corrections:
-                    # 模拟断开客户端的贡献
-                    w_locals_client.append({k: v + server_corrections[idx][k] for k, v in net_glob_client.state_dict().items()})
                 continue
             else:
-                w_locals_client.append(copy.deepcopy(w_client))
-                w_glob_server_buffer.append(copy.deepcopy(w_glob_server))
+                w_locals_client.append(w_client)  # 已在 CPU
+                w_glob_server_buffer.append(w_glob_server)  # 已在 CPU
 
                 # 更新校正变量
                 global_update = net_glob_client.state_dict()
