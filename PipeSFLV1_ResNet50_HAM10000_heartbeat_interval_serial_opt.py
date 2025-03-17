@@ -519,7 +519,7 @@ def monitor_heartbeats(heartbeat_queue, num_users):
         try:
             idx, status, timestamp = heartbeat_queue.get(timeout=30)
             client_status[idx] = {"status": status, "last_heartbeat": timestamp, "type": "normal" if status != "disconnected" else "disconnected"}
-            print(f"[Heartbeat] Client {idx}: {status} - Last: {timestamp} - ({client_status[idx]['type']})")
+            # print(f"[Heartbeat] Client {idx}: {status} - Last: {timestamp} - ({client_status[idx]['type']})")
 
             # 检查超时（超过3倍间隔未收到心跳）
             # if (time.time() - time.mktime(
