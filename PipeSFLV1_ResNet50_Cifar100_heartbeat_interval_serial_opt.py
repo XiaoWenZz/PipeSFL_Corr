@@ -142,12 +142,13 @@ class ResNet50_server_side(nn.Module):
 #                                  Server Side Programs
 # ====================================================================================================
 # Federated averaging: FedAvg
-def FedAvg(w):
+def FedAvg(w, corrections):
     print('len(w):', len(w))
     w_avg = copy.deepcopy(w[0])
     for k in w_avg.keys():
         for i in range(1, len(w)):
-            w_avg[k] += w[i][k]
+            # 应用校正变量
+            w_avg[k] += w[i][k] + corrections.get(i, {k: torch.zeros_like(w[i][k])})[k]
         w_avg[k] = torch.div(w_avg[k], len(w))
     return w_avg
 
@@ -249,6 +250,8 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
             global acc_avg_all_user_train_global, loss_avg_all_user_train_global
             acc_avg_all_user_train_global = acc_avg_all_user_train
             loss_avg_all_user_train_global = loss_avg_all_user_train
+            acc_train_collect.append(acc_avg_all_user_train)
+            loss_train_collect.append(loss_avg_all_user_train)
 
     # send gradients to the client
     # server_result_queue.put(dfx_client.to('cuda:'+str(idx)))
@@ -544,7 +547,7 @@ if __name__ == '__main__':
     # ===================================================================
     # No. of users
     num_users = 3
-    epochs = 50
+    epochs = 2
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
     train_times = []
@@ -592,6 +595,9 @@ if __name__ == '__main__':
     monitor_process = multiprocessing.Process(target=monitor_heartbeats, args=(heartbeat_queue, num_users))
     monitor_process.start()
 
+    # 初始化校正变量
+    server_corrections = {i: {k: torch.zeros_like(v) for k, v in net_glob_client.state_dict().items()} for i in range(num_users)}
+
     # =============================================================================
     #                         Data preprocessing
     # =============================================================================
@@ -600,7 +606,7 @@ if __name__ == '__main__':
 
     lesion_type = {
         'nv': 'Melanocytic nevi',
-        'mel': 'Melanoma',
+      'mel': 'Melanoma',
         'bkl': 'Benign keratosis-like lesions ',
         'bcc': 'Basal cell carcinoma',
         'akiec': 'Actinic keratoses',
@@ -683,8 +689,8 @@ if __name__ == '__main__':
         start_time = time.time()
         m = max(int(frac * num_users), 1)
         idxs_users = np.random.choice(range(num_users), m, replace=False)
-        w_locals_client = manager.list()
-        w_glob_server_buffer = manager.list()
+        w_locals_client = []
+        w_glob_server_buffer = []
 
         for idx in idxs_users:
             local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
@@ -696,11 +702,20 @@ if __name__ == '__main__':
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to('cuda:0'))
 
             if local.is_disconnected:
-                prRed(f"Client{idx} 断开连接，跳过训练, 不参与联邦学习")
+                prRed(f"Client{idx} 断开连接，使用校正变量模拟更新")
+                if idx in server_corrections:
+                    # 模拟断开客户端的贡献
+                    w_locals_client.append({k: v + server_corrections[idx][k] for k, v in net_glob_client.state_dict().items()})
                 continue
             else:
                 w_locals_client.append(copy.deepcopy(w_client))
                 w_glob_server_buffer.append(copy.deepcopy(w_glob_server))
+
+                # 更新校正变量
+                global_update = net_glob_client.state_dict()
+                for k in global_update.keys():
+                    server_corrections[idx][k] = global_update[k] - w_client[k]
+
                 # Testing -------------------
                 local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
 
@@ -713,8 +728,8 @@ if __name__ == '__main__':
         if len(w_locals_client) == 0:
             print("No clients available for Federated Learning!")
         else:
-            w_glob_client = FedAvg(w_locals_client)
-            w_glob_server = FedAvg(w_glob_server_buffer)
+            w_glob_client = FedAvg(w_locals_client, server_corrections)
+            w_glob_server = FedAvg(w_glob_server_buffer, server_corrections)
 
             # Update client-side global model
             net_glob_client.load_state_dict(w_glob_client)
