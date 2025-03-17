@@ -884,7 +884,7 @@ if __name__ == '__main__':
     plt.savefig(loss_curve_filename)
     print('Data saved successfully!')
 
-    running = False
+    running.value = False
 
     # 结束心跳监测进程
     monitor_process.terminate()
