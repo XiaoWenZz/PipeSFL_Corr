@@ -180,7 +180,7 @@ def calculate_accuracy(fx, y):
 # Server-side function associated with Training
 def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_server, lr, criterion,
                  batch_acc_train, batch_loss_train, count1, loss_train_collect_user, acc_train_collect_user,
-                 idx_collect,
+                 idx_collect, idx_disconnected,
                  num_users):
     global l_epoch_check, fed_check
     net_glob_server = net_glob_server.to('cuda:0')  # 将模型移到 GPU 上
@@ -251,7 +251,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
                 # print(idx_collect)
 
         # This is to check if all users are served for one round --------------------
-        if len(idx_collect) == num_users:
+        if len(idx_collect) + len(idx_disconnected) == num_users:
             fed_check = True  # to evaluate_server function  - to check fed check has hitted
             # all users served for one round ------------------------- output print and update is done in evaluate_server()
             # for nicer display
@@ -367,7 +367,7 @@ class DatasetSplit(Dataset):
 # Client-side functions associated with Training and Testing
 class Client(object):
     def __init__(self, net_client_model, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
-                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.01):
+                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.01, idx_disconnected=None):
         self.disconnect_prob = disconnect_prob  # 断开概率
         self.is_disconnected = False  # 是否已断开
         self.heartbeat_queue = heartbeat_queue
@@ -388,6 +388,7 @@ class Client(object):
         self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size=256, shuffle=True)
         self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size=256, shuffle=True)
 
+        self.idx_disconnected = idx_disconnected
         # 新增心跳管理
         self.status = "idle"  # idle, training, testing
         self.heartbeat_interval = 5  # 5秒心跳间隔
@@ -407,6 +408,11 @@ class Client(object):
                     print(f"[Disconnect] Client{self.idx} 断开 (概率{self.disconnect_prob * 100}%)")
                     # 发送断开信号后休眠
                     self.heartbeat_queue.put((self.idx, "disconnected", time.strftime("%Y-%m-%d %H:%M:%S")))
+
+                    # 在idx_disconnected中记录已断开的客户端
+                    if self.idx not in self.idx_disconnected:
+                        idx_disconnected.append(self.idx)
+
                     time.sleep(self.heartbeat_interval)
                     continue
 
@@ -466,7 +472,7 @@ class Client(object):
                                                             self.lr, self.criterion, self.batch_acc_train,
                                                             self.batch_loss_train, self.count1,
                                                             self.loss_train_collect_user,
-                                                            self.acc_train_collect_user, self.idx_collect,
+                                                            self.acc_train_collect_user, self.idx_collect, self.idx_disconnected,
                                                             self.num_users)
 
                         fx.backward(dfx)
@@ -611,6 +617,7 @@ if __name__ == '__main__':
 
     # client idx collector
     idx_collect = manager.list()
+    idx_disconnected = manager.list()
     l_epoch_check = False
     fed_check = False
 
@@ -725,7 +732,7 @@ if __name__ == '__main__':
             local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
                            dataset_train=dataset_train,
                            dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
-                           heartbeat_queue=heartbeat_queue, disconnect_prob=0.01)
+                           heartbeat_queue=heartbeat_queue, disconnect_prob=0.01, idx_disconnected=idx_disconnected)
 
             # Training ------------------
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
