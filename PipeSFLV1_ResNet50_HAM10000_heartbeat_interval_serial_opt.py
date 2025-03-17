@@ -377,7 +377,7 @@ class Client(object):
 
         # 新增心跳管理
         self.status = "idle"  # idle, training, testing
-        self.heartbeat_interval = 10  # 10秒心跳间隔
+        self.heartbeat_interval = 5  # 5秒心跳间隔
         # 心跳线程在初始化最后启动（确保属性已创建）
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
         self.heartbeat_thread.start()
@@ -505,7 +505,7 @@ def monitor_heartbeats(heartbeat_queue, num_users):
     client_status = {i: {"status": "idle", "last_heartbeat": "", "type": "normal"} for i in range(num_users)}
     while True:
         try:
-            idx, status, timestamp = heartbeat_queue.get(timeout=15)
+            idx, status, timestamp = heartbeat_queue.get(timeout=30)
             client_status[idx] = {"status": status, "last_heartbeat": timestamp, "type": "normal" if status != "disconnected" else "disconnected"}
             print(f"[Heartbeat] Client {idx}: {status} - Last: {timestamp} - ({client_status[idx]['type']})")
 
