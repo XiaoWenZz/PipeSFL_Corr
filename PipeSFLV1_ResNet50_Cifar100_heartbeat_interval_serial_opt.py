@@ -144,12 +144,15 @@ class ResNet50_server_side(nn.Module):
 # Federated averaging: FedAvg
 def FedAvg(w, corrections):
     print('len(w):', len(w))
+    if not w:  # 无有效客户端时返回空
+        return {}
     w_avg = copy.deepcopy(w[0])
     for k in w_avg.keys():
-        for i in range(1, len(w)):
-            # 应用校正变量
-            w_avg[k] += w[i][k] + corrections.get(i, {k: torch.zeros_like(w[i][k])})[k]
-        w_avg[k] = torch.div(w_avg[k], len(w))
+        total = w_avg[k].clone()
+        for i, params in enumerate(w):
+            corr = corrections.get(i, {k: torch.zeros_like(params[k])})[k]
+            total += params[k] + corr
+        w_avg[k] = total / len(w)
     return w_avg
 
 
@@ -407,6 +410,9 @@ class Client(object):
         else:
             try:
                 self.status = "training"  # 更新状态
+                self.status = "training"
+                net = net.to('cuda:0')  # 显式移到 GPU
+                self.net_glob_server = self.net_glob_server.to('cuda:0')
                 net.train()
                 optimizer_client = torch.optim.Adam(net.parameters(), lr=self.lr)
 
@@ -451,7 +457,7 @@ class Client(object):
 
                 net.to('cpu')
                 net_glob_server.to('cpu')
-                return net.state_dict(), net_glob_server.state_dict()
+                return net.cpu().state_dict(), self.net_glob_server.cpu().state_dict()
             finally:
                 self.status = "idle"  # 任务结束更新状态
 
