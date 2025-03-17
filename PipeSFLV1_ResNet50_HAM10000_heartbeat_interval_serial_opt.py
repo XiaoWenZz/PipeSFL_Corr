@@ -593,7 +593,7 @@ if __name__ == '__main__':
     # ===================================================================
     # No. of users
     num_users = 3
-    epochs = 5
+    epochs = 10
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
     train_times = []
@@ -744,7 +744,7 @@ if __name__ == '__main__':
             local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
                            dataset_train=dataset_train,
                            dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
-                           heartbeat_queue=heartbeat_queue, disconnect_prob=0.001, idx_disconnected=idx_disconnected, running=running)
+                           heartbeat_queue=heartbeat_queue, disconnect_prob=0, idx_disconnected=idx_disconnected, running=running)
 
             # Training ------------------
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
