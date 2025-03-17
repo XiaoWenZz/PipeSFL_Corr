@@ -517,6 +517,11 @@ def monitor_heartbeats(heartbeat_queue, num_users):
                     print(f"[Error] Client {idx} exited unexpectedly!")
                     client_status[idx] = {"status": "idle", "last_heartbeat": "", "type": "disconnected"}
 
+        except IOError as e:  # 捕获管道关闭错误
+            if "[WinError 232]" in str(e):
+                print("[Info] 管道正常关闭，退出监测...")
+                return
+
         except Exception as e:
             print(f"[Error] An unexpected error occurred: {e}")
 
