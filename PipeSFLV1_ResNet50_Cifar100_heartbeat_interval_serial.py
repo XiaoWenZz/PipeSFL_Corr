@@ -379,7 +379,7 @@ class Client(object):
         while True:
             if not self.is_disconnected:
                 # 仅在未断开时检查是否断开
-                self.is_disconnected = random.random() < self.disconnect_prob
+                self.is_disconnected = random.random() < self.disconnect_prob and self.status != "idle"
                 if self.is_disconnected:
                     print(f"[Disconnect] Client{self.idx} 断开 (概率{self.disconnect_prob * 100}%)")
                     # 发送断开信号后休眠
