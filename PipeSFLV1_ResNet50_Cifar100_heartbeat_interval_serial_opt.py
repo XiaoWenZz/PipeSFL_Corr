@@ -559,7 +559,7 @@ if __name__ == '__main__':
     # ===================================================================
     # No. of users
     num_users = 3
-    epochs = 2
+    epochs = 5
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
     train_times = []
