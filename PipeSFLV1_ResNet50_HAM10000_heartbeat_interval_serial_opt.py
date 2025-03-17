@@ -252,6 +252,9 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
 
         # This is to check if all users are served for one round --------------------
         if len(idx_collect) + len(idx_disconnected) == num_users:
+            # for debugging print idxes of idx_collect and idx_disconnected
+            print(f"[Debug] idx_collect: {idx_collect}")
+            print(f"[Debug] idx_disconnected: {idx_disconnected}")
             fed_check = True  # to evaluate_server function  - to check fed check has hitted
             # all users served for one round ------------------------- output print and update is done in evaluate_server()
             # for nicer display
