@@ -398,8 +398,11 @@ class Client(object):
         while True:
             if not self.is_disconnected:
                 # 仅在未断开时检查是否断开
-                self.is_disconnected = random.random() < self.disconnect_prob and self.status != "idle"
+                random_num = random.random()
+                self.is_disconnected = random_num < self.disconnect_prob and self.status != "idle"
                 if self.is_disconnected:
+                    # for debugging print random number
+                    print(f"[Random] Client{self.idx} 随机数: {random_num}")
                     print(f"[Disconnect] Client{self.idx} 断开 (概率{self.disconnect_prob * 100}%)")
                     # 发送断开信号后休眠
                     self.heartbeat_queue.put((self.idx, "disconnected", time.strftime("%Y-%m-%d %H:%M:%S")))
