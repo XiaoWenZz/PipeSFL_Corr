@@ -813,6 +813,31 @@ if __name__ == '__main__':
                                       'PipeSFLV1_ResNet50_HAM10000_Server_Loss' + time.strftime("%Y%m%d%H%M%S",
                                                                                                 time.localtime()) + '.csv')
     loss_test_df.to_csv(loss_test_filename, index=False)
+
+    # 绘制训练和测试的acc曲线
+    plt.plot(range(epochs), acc_train_collect_list, label='Train Accuracy')
+    plt.plot(range(epochs), acc_test_collect_list, label='Test Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.title('Training and Testing Accuracy')
+    plt.legend()
+    plt.grid(True)
+    acc_curve_filename = os.path.join(curve_dir,
+                                      'acc_curve' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
+    plt.savefig(acc_curve_filename)
+    plt.clf()  # 清除当前图形
+
+    # 绘制训练和测试的loss曲线
+    plt.plot(range(epochs), loss_train_collect_list, label='Train Loss')
+    plt.plot(range(epochs), loss_test_collect_list, label='Test Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('Training and Testing Loss')
+    plt.legend()
+    plt.grid(True)
+    loss_curve_filename = os.path.join(curve_dir,
+                                       'loss_curve' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
+    plt.savefig(loss_curve_filename)
     print('Data saved successfully!')
 
     # 结束心跳监测进程
