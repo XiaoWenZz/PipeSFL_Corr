@@ -402,33 +402,37 @@ class Client(object):
         self.heartbeat_thread.start()
 
     def send_heartbeat(self):
-        while self.running.value:
-            if not self.is_disconnected:
-                # 仅在未断开时检查是否断开
-                random_num = numpy.random.random()
-                self.is_disconnected = random_num < self.disconnect_prob and self.status != "idle"
+        try:
+            while self.running.value:
+                if not self.is_disconnected:
+                    # 仅在未断开时检查是否断开
+                    random_num = numpy.random.random()
+                    self.is_disconnected = random_num < self.disconnect_prob and self.status != "idle"
+                    if self.is_disconnected:
+                        # for debugging print random number
+                        print(f"[Random] Client{self.idx} 随机数: {random_num}")
+                        print(f"[Disconnect] Client{self.idx} 断开 (概率{self.disconnect_prob * 100}%)")
+                        # 发送断开信号后休眠
+                        self.heartbeat_queue.put((self.idx, "disconnected", time.strftime("%Y-%m-%d %H:%M:%S")))
+
+                        # 在idx_disconnected中记录已断开的客户端
+                        if self.idx not in self.idx_disconnected:
+                            idx_disconnected.append(self.idx)
+
+                        time.sleep(self.heartbeat_interval)
+                        continue
+
                 if self.is_disconnected:
-                    # for debugging print random number
-                    print(f"[Random] Client{self.idx} 随机数: {random_num}")
-                    print(f"[Disconnect] Client{self.idx} 断开 (概率{self.disconnect_prob * 100}%)")
-                    # 发送断开信号后休眠
-                    self.heartbeat_queue.put((self.idx, "disconnected", time.strftime("%Y-%m-%d %H:%M:%S")))
-
-                    # 在idx_disconnected中记录已断开的客户端
-                    if self.idx not in self.idx_disconnected:
-                        idx_disconnected.append(self.idx)
-
+                    # 断开后持续休眠，不再尝试连接
                     time.sleep(self.heartbeat_interval)
                     continue
 
-            if self.is_disconnected:
-                # 断开后持续休眠，不再尝试连接
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                self.heartbeat_queue.put((self.idx, self.status, timestamp))
                 time.sleep(self.heartbeat_interval)
-                continue
 
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            self.heartbeat_queue.put((self.idx, self.status, timestamp))
-            time.sleep(self.heartbeat_interval)
+        except (EOFError, BrokenPipeError):
+            print(f"[Info] Client{self.idx} 心跳线程因连接断开而退出")
 
         # 线程结束，打印退出信息
         print(f"[Info] Client{self.idx} 心跳线程结束")
@@ -817,6 +821,7 @@ if __name__ == '__main__':
     curve_filename = os.path.join(curve_dir,
                                   'train_time_curve' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
     plt.savefig(curve_filename)
+    plt.clf()  # 清除当前图形
 
     # 保存模型 命名为 模型名+当前时间
     client_model_filename = os.path.join(model_dir, 'PipeSFLV1_ResNet50_HAM10000_Client' + time.strftime("%Y%m%d%H%M%S",
@@ -888,3 +893,6 @@ if __name__ == '__main__':
     # 结束心跳监测进程
     monitor_process.terminate()
     monitor_process.join()
+
+    time.sleep(5)  # 等待一段时间，确保所有线程有足够时间退出
+    print("程序正常结束")
