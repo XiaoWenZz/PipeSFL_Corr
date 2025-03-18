@@ -775,8 +775,9 @@ if __name__ == '__main__':
     # this epoch is global epoch, also known as rounds
 
     for iter in range(epochs):
-        idx_collect.clear()
-        idx_disconnected.clear()
+        # 清空idx_collect和idx_disconnected
+        idx_collect[:] = []
+        idx_disconnected[:] = []
         start_time = time.time()
         m = max(int(frac * num_users), 1)
         idxs_users = np.random.choice(range(num_users), m, replace=False)
