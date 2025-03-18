@@ -166,8 +166,9 @@ def FedAvg(w, corrections, model_type):
             # 防御性编程：确保参数在corrections中存在
             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
             if i not in idx_disconnected:
-                corr = 0
-            total += params[k].cpu() - corr.cpu()
+                total += params[k].cpu()
+            else:
+                total += params[k].cpu() - corr.cpu()
         w_avg[k] = total / len(w)
     return w_avg
 
@@ -439,9 +440,34 @@ class Client(object):
         # 线程结束，打印退出信息
         print(f"[Info] Client{self.idx} 心跳线程结束")
 
+    def update_fed_check(self):
+        """新增鲁棒性保证 如果最后一个client在训练时退出将导致fed_check无法置为True 在这里再做一次检查"""
+        global l_epoch_check, fed_check
+        if len(self.idx_collect) + len(self.idx_disconnected) == self.num_users:
+            fed_check = True
+            # 确保列表中有数据再计算平均
+            if len(self.acc_train_collect_user) > 0:
+                acc_avg_all_user_train = sum(self.acc_train_collect_user) / len(self.acc_train_collect_user)
+                loss_avg_all_user_train = sum(self.loss_train_collect_user) / len(self.loss_train_collect_user)
+            else:
+                acc_avg_all_user_train = 0
+                loss_avg_all_user_train = 0
+
+            global acc_avg_all_user_train_global, loss_avg_all_user_train_global
+            acc_avg_all_user_train_global = acc_avg_all_user_train
+            loss_avg_all_user_train_global = loss_avg_all_user_train
+            acc_train_collect.append(acc_avg_all_user_train)
+            loss_train_collect.append(loss_avg_all_user_train)
+        return None, None
+
     def train(self, net):
+        global l_epoch_check, fed_check
         if self.is_disconnected:
             print(f"[Skip] Client{self.idx} 断开，跳过训练")
+            if self.idx not in self.idx_disconnected:
+                idx_disconnected.append(self.idx)
+            if fed_check == False and len(self.idx_collect) + len(self.idx_disconnected) == self.num_users:
+                self.update_fed_check()
             return None, None
 
         else:
@@ -457,6 +483,10 @@ class Client(object):
                     # 检查是否断开连接
                     if self.is_disconnected:
                         print(f"[Abort] Client{self.idx} 训练期间断开，终止训练")
+                        if self.idx not in self.idx_disconnected:
+                            idx_disconnected.append(self.idx)
+                        if fed_check == False and len(self.idx_collect) + len(self.idx_disconnected) == self.num_users:
+                            self.update_fed_check()
                         break
                     len_batch = len(self.ldr_train)
 
@@ -465,6 +495,11 @@ class Client(object):
                         # 检查是否断开连接
                         if self.is_disconnected:
                             print(f"[Abort] Client{self.idx} 训练期间断开，终止训练")
+                            if self.idx not in self.idx_disconnected:
+                                idx_disconnected.append(self.idx)
+                            if fed_check == False and len(self.idx_collect) + len(
+                                    self.idx_disconnected) == self.num_users:
+                                self.update_fed_check()
                             break
 
                         images, labels = images.to('cuda:0'), labels.to('cuda:0')
@@ -736,6 +771,8 @@ if __name__ == '__main__':
     # this epoch is global epoch, also known as rounds
 
     for iter in range(epochs):
+        idx_collect.clear()
+        idx_disconnected.clear()
         start_time = time.time()
         m = max(int(frac * num_users), 1)
         idxs_users = np.random.choice(range(num_users), m, replace=False)
@@ -771,8 +808,6 @@ if __name__ == '__main__':
                 # Testing -------------------
                 local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
 
-        idx_collect = manager.list()
-        idx_disconnected = manager.list()
         # Federation process at Client-Side------------------------
         print("------------------------------------------------------------")
         print("------ Fed Server: Federation process at Client-Side -------")
