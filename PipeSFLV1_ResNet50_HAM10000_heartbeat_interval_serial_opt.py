@@ -878,6 +878,9 @@ if __name__ == '__main__':
     torch.save(net_glob_server.state_dict(), server_model_filename)
     print('Model saved successfully!')
 
+    # for debugging print length of acc_train_collect and loss_train_collect
+    print('length of acc_train_collect:', len(acc_train_collect))
+    print('length of loss_train_collect:', len(loss_train_collect))
     # 保存acc和loss数据
     acc_train_collect_list = list(acc_train_collect)
     loss_train_collect_list = list(loss_train_collect)
@@ -920,10 +923,6 @@ if __name__ == '__main__':
                                       'acc_curve' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
     plt.savefig(acc_curve_filename)
     plt.clf()  # 清除当前图形
-
-    # for debugging print length of acc_train_collect and loss_train_collect
-    print('length of acc_train_collect:', len(acc_train_collect))
-    print('length of loss_train_collect:', len(loss_train_collect))
 
     # 绘制训练和测试的loss曲线
     plt.plot(range(epochs), loss_train_collect_list, label='Train Loss')
