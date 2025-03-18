@@ -165,7 +165,9 @@ def FedAvg(w, corrections, model_type):
         for i, params in enumerate(w):
             # 防御性编程：确保参数在corrections中存在
             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
-            total += params[k].cpu() + corr.cpu()
+            if i not in idx_disconnected:
+                corr = 0
+            total += params[k].cpu() - corr.cpu()
         w_avg[k] = total / len(w)
     return w_avg
 
@@ -756,12 +758,12 @@ if __name__ == '__main__':
                 w_locals_client.append(w_client)  # 已在 CPU
                 w_glob_server_buffer.append(w_glob_server)  # 已在 CPU
 
-                # 客户端训练后，更新客户端校正项（原逻辑）
+                # 客户端训练后，更新客户端校正项
                 global_update_client = net_glob_client.state_dict()
                 for k in global_update_client.keys():
                     client_corrections[idx][k] = global_update_client[k] - w_client[k]
 
-                # 服务器端训练后（需新增逻辑），更新服务器端校正项
+                # 服务器端训练后，更新服务器端校正项
                 global_update_server = net_glob_server.state_dict()
                 for k in global_update_server.keys():
                     server_corrections[idx][k] = global_update_server[k] - w_glob_server[k]
