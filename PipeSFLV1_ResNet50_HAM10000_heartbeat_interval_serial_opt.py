@@ -446,6 +446,12 @@ class Client(object):
         # 线程结束，打印退出信息
         print(f"[Info] Client{self.idx} 心跳线程结束")
 
+    def stop_heartbeat(self):
+        """停止心跳线程"""
+        self.heartbeat_running = False
+        if self.heartbeat_thread.is_alive():
+            self.heartbeat_thread.join()  # 等待线程结束
+
     def update_fed_check(self):
         """新增鲁棒性保证 如果最后一个client在训练时退出将导致fed_check无法置为True 在这里再做一次检查"""
         global l_epoch_check, fed_check
@@ -816,6 +822,10 @@ if __name__ == '__main__':
 
                 # Testing -------------------
                 local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
+
+                # 新增：停止当前客户端心跳
+                local.stop_heartbeat()
+                del local  # 确保资源释放
 
         # Federation process at Client-Side------------------------
         print("------------------------------------------------------------")
