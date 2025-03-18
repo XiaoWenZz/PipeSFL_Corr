@@ -1,5 +1,6 @@
 import queue
 import threading
+import argparse
 
 import numpy.random
 from matplotlib import pyplot as plt
@@ -622,6 +623,11 @@ if __name__ == '__main__':
     manager = multiprocessing.Manager()
     running = manager.Value('b', True)
 
+    parser = argparse.ArgumentParser(description='Training script')
+    parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
+    parser.add_argument('--disconnect_prob', type=float, default=0.01, help='Disconnect probability')
+    args = parser.parse_args()
+
     SEED = 1234
     random.seed(SEED)
     np.random.seed(SEED)
@@ -644,7 +650,8 @@ if __name__ == '__main__':
     # ===================================================================
     # No. of users
     num_users = 3
-    epochs = 50
+    epochs = args.epochs
+    disconnect_prob = args.disconnect_prob
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
     train_times = []
@@ -798,7 +805,7 @@ if __name__ == '__main__':
             local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
                            dataset_train=dataset_train,
                            dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
-                           heartbeat_queue=heartbeat_queue, disconnect_prob=0.01, idx_disconnected=idx_disconnected, running=running)
+                           heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob, idx_disconnected=idx_disconnected, running=running)
 
             # Training ------------------
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))

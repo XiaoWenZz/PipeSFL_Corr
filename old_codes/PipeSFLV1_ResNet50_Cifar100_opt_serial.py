@@ -646,8 +646,8 @@ if __name__ == '__main__':
         normalize,
     ])
 
-    train_directory = os.path.join('./data/cifar-100-python', 'train1')
-    valid_directory = os.path.join('./data/cifar-100-python', 'val')
+    train_directory = os.path.join('../data/cifar-100-python', 'train1')
+    valid_directory = os.path.join('../data/cifar-100-python', 'val')
     dataset_train = datasets.ImageFolder(root=train_directory, transform=train_transform)
     dataset_test = datasets.ImageFolder(root=valid_directory, transform=test_transform)
 
@@ -709,10 +709,10 @@ if __name__ == '__main__':
     # =============================================================================
 
     # 确保输出目录存在
-    curve_dir = 'output/curve'
-    model_dir = 'output/model'
-    acc_dir = 'output/acc'
-    loss_dir = 'output/loss'
+    curve_dir = '../output/curve'
+    model_dir = '../output/model'
+    acc_dir = '../output/acc'
+    loss_dir = '../output/loss'
 
     for directory in [curve_dir, model_dir, acc_dir, loss_dir]:
         if not os.path.exists(directory):

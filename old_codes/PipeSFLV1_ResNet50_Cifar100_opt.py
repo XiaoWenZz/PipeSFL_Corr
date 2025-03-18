@@ -1,13 +1,13 @@
 #=============================================================================
 # SplitfedV2 (SFLV2) learning: ResNet18 on HAM10000
-# HAM10000 dataset: Tschandl, P.: The HAM10000 dataset, a large collection of multi-source dermatoscopic images of common pigmented skin lesions (2018), doi:10.7910/DVN/DBW86T
+# HAM10000 dataset: Tschandl, P.: The HAM10000 dataset, a large collection of multi - source dermatoscopic images of common pigmented skin lesions (2018), doi:10.7910/DVN/DBW86T
 
 # We have three versions of our implementations
 # Version1: without using socket and no DP+PixelDP
 # Version2: with using socket but no DP+PixelDP
 # Version3: without using socket but with DP+PixelDP
 
-# This program is Version1: Single program simulation 
+# This program is Version1: Single program simulation
 # ==============================================================================
 import torch
 from torch import nn
@@ -27,14 +27,16 @@ import os
 from torchvision import datasets, models
 import multiprocessing
 import time
+import matplotlib.pyplot as plt
 
 # import matplotlib
 # matplotlib.use('Agg')
 # import matplotlib.pyplot as plt
 import copy
 
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # 使用单 GPU
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1' # RuntimeError: CUDA error: unspecified launch failure 调试
 
 # To print in color -------test/train of the client side
 def prRed(skk):
@@ -132,6 +134,13 @@ class ResNet50_server_side(nn.Module):
 #====================================================================================================
 # Federated averaging: FedAvg
 def FedAvg(w):
+    # 去除所有模型的 module. 前缀 并打印所有的键名
+    for i in range(len(w)):
+        for k in list(w[i].keys()):  # 使用 list() 避免字典大小改变的错误
+            if k.startswith('module.'):
+                w[i][k.replace('module.', '')] = w[i].pop(k)
+        print(w[i].keys())
+
     w_avg = copy.deepcopy(w[0])
     for k in w_avg.keys():
         for i in range(1, len(w)):
@@ -139,15 +148,25 @@ def FedAvg(w):
         w_avg[k] = torch.div(w_avg[k], len(w))
     return w_avg
 
+# def FedAvg(w):
+#     if isinstance(w[0], dict) and next(iter(w[0])).startswith('module.'):
+#         # 如果键名有 module. 前缀，去掉前缀
+#         w = [{k.replace('module.', ''): v for k, v in state_dict.items()} for state_dict in w]
+#     w_avg = copy.deepcopy(w[0])
+#     for k in w_avg.keys():
+#         for i in range(1, len(w)):
+#             w_avg[k] += w[i][k]
+#         w_avg[k] = torch.div(w_avg[k], len(w))
+#     return w_avg
+
 def calculate_accuracy(fx, y):
     preds = fx.max(1, keepdim=True)[1]
     correct = preds.eq(y.view_as(preds)).sum()
-    acc = 100.00 *correct.float()/preds.shape[0]
+    acc = 100.00 * correct.float() / preds.shape[0]
     return acc
 
 
-
-# Server-side function associated with Training 
+# Server-side function associated with Training
 def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_server, lr, criterion,
                  batch_acc_train, batch_loss_train, count1, loss_train_collect_user, acc_train_collect_user, idx_collect,
                  num_users, priority_queue, Server_FF_time_queue, BP_priority_queue, lock):
@@ -171,81 +190,90 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     y = y
     # print('y:', y)
     # print('len(y):', len(y))
-    
+
     #---------forward prop-------------
+    fx_client = fx_client.to(torch.device("cuda"))
+    y = y.to(torch.device("cuda"))
     fx_server = net_glob_server(fx_client)
-    
+
     # calculate loss
     loss = criterion(fx_server, y)
     # calculate accuracy
     acc = calculate_accuracy(fx_server, y)
 
     with lock:
-        del priority_queue[0]
-        del Server_FF_time_queue[0]
+        if len(priority_queue) > 0:
+            del priority_queue[0]
+        if len(Server_FF_time_queue) > 0:
+            del Server_FF_time_queue[0]
+    # while True:
+    #     if BP_priority_queue[0] == idx:
+    #         break
+    # 修改等待逻辑
     while True:
-        if BP_priority_queue[0] == idx:
-            break
-    
+        with lock:  # 加锁检查
+            if len(BP_priority_queue) > 0 and BP_priority_queue[0] == idx:
+                break
+        time.sleep(0.1)  # 避免忙等待
+
     #--------backward prop--------------
     loss.backward()
     dfx_client = fx_client.grad.clone().detach()
     optimizer_server.step()
-    
+
     batch_loss_train.append(loss.item())
     batch_acc_train.append(acc.item())
-    
+
     # server-side model net_glob_server is global so it is updated automatically in each pass to this function
-    
+
     # count1: to track the completion of the local batch associated with one client
     # count1 += 1
     # print('count1:', count1, '<===>len_batch:', len_batch)
     if count1 == len_batch:
-        acc_avg_train = sum(batch_acc_train)/len(batch_acc_train)           # it has accuracy for one batch
-        loss_avg_train = sum(batch_loss_train)/len(batch_loss_train)
-        
+        acc_avg_train = sum(batch_acc_train) / len(batch_acc_train)           # it has accuracy for one batch
+        loss_avg_train = sum(batch_loss_train) / len(batch_loss_train)
+
         batch_acc_train = []
         batch_loss_train = []
         count1 = 0
-        
+
         prRed('Client{} Train => Local Epoch: {} \tAcc: {:.3f} \tLoss: {:.4f}'.format(idx, l_epoch_count, acc_avg_train, loss_avg_train))
-        
-                
+
         # If one local epoch is completed, after this a new client will come
-        if l_epoch_count == l_epoch-1:
-            
+        if l_epoch_count == l_epoch - 1:
+
             l_epoch_check = True                # to evaluate_server function - to check local epoch has completed or not
-                       
+
             # we store the last accuracy in the last batch of the epoch and it is not the average of all local epochs
             # this is because we work on the last trained model and its accuracy (not earlier cases)
-            
+
             #print("accuracy = ", acc_avg_train)
             acc_avg_train_all = acc_avg_train
             loss_avg_train_all = loss_avg_train
-                        
+
             # accumulate accuracy and loss for each new user
             loss_train_collect_user.append(loss_avg_train_all)
             acc_train_collect_user.append(acc_avg_train_all)
-            
-            # collect the id of each new user                        
+
+            # collect the id of each new user
             if idx not in idx_collect:
-                idx_collect.append(idx) 
+                idx_collect.append(idx)
                 #print(idx_collect)
-        
+
         # This is to check if all users are served for one round --------------------
         if len(idx_collect) == num_users:
             fed_check = True                                                  # to evaluate_server function  - to check fed check has hitted
             # all users served for one round ------------------------- output print and update is done in evaluate_server()
-            # for nicer display 
-                        
+            # for nicer display
+
             idx_collect = []
-            
-            acc_avg_all_user_train = sum(acc_train_collect_user)/len(acc_train_collect_user)
-            loss_avg_all_user_train = sum(loss_train_collect_user)/len(loss_train_collect_user)
-            
+
+            acc_avg_all_user_train = sum(acc_train_collect_user) / len(acc_train_collect_user)
+            loss_avg_all_user_train = sum(loss_train_collect_user) / len(loss_train_collect_user)
+
             # loss_train_collect.append(loss_avg_all_user_train)
             # acc_train_collect.append(acc_avg_all_user_train)
-            
+
             acc_train_collect_user = []
             loss_train_collect_user = []
 
@@ -258,65 +286,63 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
     global net_glob_server, criterion, batch_acc_test, batch_loss_test
     global loss_test_collect, acc_test_collect, count2, num_users, acc_avg_train_all, loss_avg_train_all, l_epoch_check, fed_check
     global loss_test_collect_user, acc_test_collect_user, acc_avg_all_user_train, loss_avg_all_user_train
-    
+
     net_glob_server.eval()
-  
+
     with torch.no_grad():
-        fx_client = fx_client.to('cuda:'+str(idx))
-        y = y.to('cuda:'+str(idx))
+        fx_client = fx_client.to(torch.device("cuda"))
+        y = y.to(torch.device("cuda"))
         #---------forward prop-------------
         fx_server = net_glob_server(fx_client)
-        
+
         # calculate loss
         loss = criterion(fx_server, y)
         # calculate accuracy
         acc = calculate_accuracy(fx_server, y)
-        
-        
+
         batch_loss_test.append(loss.item())
         batch_acc_test.append(acc.item())
-        
-               
+
         count2 += 1
         if count2 == len_batch:
-            acc_avg_test = sum(batch_acc_test)/len(batch_acc_test)
-            loss_avg_test = sum(batch_loss_test)/len(batch_loss_test)
-            
+            acc_avg_test = sum(batch_acc_test) / len(batch_acc_test)
+            loss_avg_test = sum(batch_loss_test) / len(batch_loss_test)
+
             batch_acc_test = []
             batch_loss_test = []
             count2 = 0
-            
+
             print('Client{} Test =>                   \tAcc: {:.3f} \tLoss: {:.4f}'.format(idx, acc_avg_test, loss_avg_test))
-            
-            # if a local epoch is completed   
+
+            # if a local epoch is completed
             if l_epoch_check:
                 l_epoch_check = False
-                
+
                 # Store the last accuracy and loss
                 acc_avg_test_all = acc_avg_test
                 loss_avg_test_all = loss_avg_test
-                        
+
                 loss_test_collect_user.append(loss_avg_test_all)
                 acc_test_collect_user.append(acc_avg_test_all)
-                
-            # if all users are served for one round ----------                    
+
+            # if all users are served for one round ----------
             if fed_check:
                 fed_check = False
-                                
-                acc_avg_all_user = sum(acc_test_collect_user)/len(acc_test_collect_user)
-                loss_avg_all_user = sum(loss_test_collect_user)/len(loss_test_collect_user)
-            
+
+                acc_avg_all_user = sum(acc_test_collect_user) / len(acc_test_collect_user)
+                loss_avg_all_user = sum(loss_test_collect_user) / len(loss_test_collect_user)
+
                 loss_test_collect.append(loss_avg_all_user)
                 acc_test_collect.append(acc_avg_all_user)
                 acc_test_collect_user = []
-                loss_test_collect_user= []
-                              
+                loss_test_collect_user = []
+
                 print("====================== SERVER V1==========================")
                 print(' Train: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user_train, loss_avg_all_user_train))
                 print(' Test: Round {:3d}, Avg Accuracy {:.3f} | Avg Loss {:.3f}'.format(ell, acc_avg_all_user, loss_avg_all_user))
                 print("==========================================================")
-         
-    return 
+
+    return
 
 #==============================================================================================================
 #                                       Clients Side Program
@@ -337,7 +363,7 @@ class DatasetSplit(Dataset):
 class Client(object):
     def __init__(self, net_client_model, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users, priority_queue, BP_priority_queue,
                  Server_FF_time_queue, Server_BP_time_queue, client_BP_time_queue, client_FF_time_queue, w_glob_server_buffer, lock,
-                 dataset_train = None, dataset_test = None, idxs = None, idxs_test = None):
+                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None):
         self.idx = idx
         # self.device = device
         self.lr = lr
@@ -360,27 +386,27 @@ class Client(object):
         self.w_glob_server_buffer = w_glob_server_buffer
         self.lock = lock
         #self.selected_clients = []
-        self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size = 256, shuffle = True)
-        self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size = 256, shuffle = True)
-        
+        # self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size=256, shuffle=True)
+        self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size=64, shuffle=True)
+        self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size=256, shuffle=True)
 
     def train(self, net):
         net.train()
-        optimizer_client = torch.optim.Adam(net.parameters(), lr = self.lr) 
-        
+        optimizer_client = torch.optim.Adam(net.parameters(), lr=self.lr)
+
         for iter in range(self.local_ep):
             len_batch = len(self.ldr_train)
             for batch_idx, (images, labels) in enumerate(self.ldr_train):
                 FF_start_time = time.time()
-                images, labels = images.to('cuda:'+str(self.idx)), labels.to('cuda:3')
+                images, labels = images.to(torch.device("cuda:0")), labels.to(torch.device("cuda:0"))
 
                 optimizer_client.zero_grad()
-                #---------forward prop-------------
+                # ---------forward prop-------------
                 fx = net(images)
                 client_fx = fx.clone().detach()
 
                 # transmit client_fx to server
-                client_fx = client_fx.to('cuda:3')
+                client_fx = client_fx.to(torch.device("cuda:0"))
 
                 with self.lock:
                     del self.client_FF_time_queue[self.idx]
@@ -391,7 +417,8 @@ class Client(object):
                     # insert new tasks
                     if len(self.BP_priority_queue) == len(self.priority_queue):
                         is_FF = True
-                    elif len(self.BP_priority_queue) > len(self.priority_queue) and len(self.priority_queue) > 0 and self.BP_priority_queue[0] == self.priority_queue[0]:
+                    elif len(self.BP_priority_queue) > len(self.priority_queue) and len(self.priority_queue) > 0 and \
+                            self.BP_priority_queue[0] == self.priority_queue[0]:
                         is_FF = True
                     else:
                         is_FF = False
@@ -472,53 +499,59 @@ class Client(object):
                         if self.priority_queue[0] == self.idx:
                             # Sending activations to server and receiving gradients from server
                             print('client ', self.idx, ' :', self.count1, '/', len_batch)
-                            dfx, net_glob_server = train_server(client_fx, labels, iter, self.local_ep, self.idx, len_batch, self.net_glob_server,
-                                               self.lr, self.criterion, self.batch_acc_train, self.batch_loss_train, self.count1,
-                                               self.loss_train_collect_user, self.acc_train_collect_user, self.idx_collect,
-                                               self.num_users, self.priority_queue, self.Server_FF_time_queue, self.BP_priority_queue, self.lock)
+                            dfx, net_glob_server = train_server(client_fx, labels, iter, self.local_ep, self.idx,
+                                                                len_batch, self.net_glob_server,
+                                                                self.lr, self.criterion, self.batch_acc_train,
+                                                                self.batch_loss_train, self.count1,
+                                                                self.loss_train_collect_user,
+                                                                self.acc_train_collect_user, self.idx_collect,
+                                                                self.num_users, self.priority_queue,
+                                                                self.Server_FF_time_queue, self.BP_priority_queue,
+                                                                self.lock)
 
                             with self.lock:
                                 del self.BP_priority_queue[0]
                                 del self.Server_BP_time_queue[0]
                             break
-                
-                #--------backward prop -------------
+
+                # --------backward prop -------------
                 BP_start_time = time.time()
-                fx.backward(dfx.to('cuda:'+str(self.idx)))
+                fx.backward(dfx.to(torch.device("cuda:0")))
                 optimizer_client.step()
 
                 with self.lock:
                     del self.client_BP_time_queue[self.idx]
                     self.client_BP_time_queue.insert(self.idx, time.time() - BP_start_time)
-            
-            #prRed('Client{} Train => Epoch: {}'.format(self.idx, ell))
+
+            # prRed('Client{} Train => Epoch: {}'.format(self.idx, ell))
         net.to('cpu')
         net_glob_server.to('cpu')
 
         return net.state_dict(), net_glob_server.state_dict()
-    
+
     def evaluate(self, net, ell):
         net.eval()
-           
+
         with torch.no_grad():
             len_batch = len(self.ldr_test)
             for batch_idx, (images, labels) in enumerate(self.ldr_test):
-                images, labels = images.to('cuda:'+str(self.idx)), labels.to('cuda:'+str(self.idx))
+                # 修改为使用编号为 0 的 GPU 设备
+                images, labels = images.to(torch.device("cuda:0")), labels.to(torch.device("cuda:0"))
                 #---------forward prop-------------
                 fx = net(images)
-                
-                # Sending activations to server 
+
+                # Sending activations to server
                 evaluate_server(fx, labels, self.idx, len_batch, ell)
-            
+
             #prRed('Client{} Test => Epoch: {}'.format(self.idx, ell))
-            
-        return          
+
+        return
 
 #=====================================================================================================
 # dataset_iid() will create a dictionary to collect the indices of the data samples randomly for each client
 # IID HAM10000 datasets will be created based on this
 def dataset_iid(dataset, num_users):
-    
+
     num_items = int(len(dataset)/num_users)
     dict_users, all_idxs = {}, [i for i in range(len(dataset))]
     for i in range(num_users):
@@ -527,15 +560,24 @@ def dataset_iid(dataset, num_users):
     return dict_users
 
 def multiprocessing_train_and_test(local, idx, net_glob_client, net_glob_server, w_locals_client, w_glob_server_buffer):
-    net_glob_client.to('cuda:'+str(idx))
-    net_glob_server.to('cuda:3')
-    # with torch.cuda.device(idx):
-    # Training ------------------
-    w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to('cuda:'+str(idx)))
-    # print('w_client type:', type(w_client))
-    # print(w_client.device.type)
-    w_locals_client.append(copy.deepcopy(w_client))
+    torch.cuda.set_device(0)  # 显式设置GPU设备
+    # net_glob_client.to(torch.device("cuda:" + str(idx)))
+    # net_glob_server.to(torch.device("cuda:0"))
+    # # with torch.cuda.device(idx):
+    # # Training ------------------
+    # w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to(torch.device("cuda:" + str(idx))))
+    # # print('w_client type:', type(w_client))
+    # # print(w_client.device.type)
+    # w_locals_client.append(copy.deepcopy(w_client))
+    #
+    # w_glob_server_buffer.append(copy.deepcopy(w_glob_server))
 
+    # 单 GPU 环境下，将所有模型和数据都移到 GPU 0 上
+    net_glob_client.to(torch.device("cuda:0"))
+    net_glob_server.to(torch.device("cuda:0"))
+    # Training ------------------
+    w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client).to(torch.device("cuda:0")))
+    w_locals_client.append(copy.deepcopy(w_client))
     w_glob_server_buffer.append(copy.deepcopy(w_glob_server))
 
     # Testing -------------------
@@ -555,7 +597,7 @@ if __name__ == '__main__':
         torch.backends.cudnn.deterministic = True
         print(torch.cuda.get_device_name(0))
 
-        # ===================================================================
+    # ===================================================================
     program = "PipeSFLV1 ResNet50 on Cifar100"
     print(f"---------{program}----------")  # this is to identify the program in the slurm outputs files
 
@@ -565,9 +607,10 @@ if __name__ == '__main__':
     # ===================================================================
     # No. of users
     num_users = 3
-    epochs = 200
+    epochs = 20
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
+    train_times = []  # 新增：用于存储每一轮的训练时间
 
     net_glob_client = ResNet50_client_side()
     print(net_glob_client)
@@ -575,6 +618,8 @@ if __name__ == '__main__':
     # net_glob_server = manager.list()
     # net_glob_server.append(ResNet18_server_side(Baseblock, [2, 2, 2], 100))
     net_glob_server = ResNet50_server_side(100)  # 7 is my numbr of classes
+    net_glob_server = torch.nn.DataParallel(net_glob_server).to(device)  # 使用 DataParallel 进行单 GPU 并行
+    net_glob_server.share_memory()  # 启用共享内存
     print(net_glob_server)
 
     # ===================================================================================
@@ -636,8 +681,8 @@ if __name__ == '__main__':
             normalize,
             ])
 
-    train_directory = os.path.join('./data/cifar-100-python', 'train1')
-    valid_directory = os.path.join('./data/cifar-100-python', 'val')
+    train_directory = os.path.join('../data/cifar-100-python', 'train1')
+    valid_directory = os.path.join('../data/cifar-100-python', 'val')
     dataset_train = datasets.ImageFolder(root=train_directory, transform=train_transform)
     dataset_test = datasets.ImageFolder(root=valid_directory, transform=test_transform)
 
@@ -688,17 +733,31 @@ if __name__ == '__main__':
 
         # w_locals_client_copy = list(w_locals_client)
         # w_glob_client = FedAvg(w_locals_client_copy.to('CPU'))
-        w_glob_client = FedAvg(w_locals_client)
-        w_glob_server = FedAvg(w_glob_server_buffer)
+        w_locals_client_regular = list(w_locals_client)
+        # w_glob_client = FedAvg(w_locals_client)
+        w_glob_client = FedAvg(w_locals_client_regular)
+
+        w_glob_server_buffer_regular = list(w_glob_server_buffer)
+        w_glob_server = FedAvg(w_glob_server_buffer_regular)
 
         # Update client-side global model
         net_glob_client.load_state_dict(w_glob_client)
 
         # Update server-side global model
-        net_glob_server.load_state_dict(w_glob_server)
+        # net_glob_server.module.load_state_dict(w_glob_server)  # 使用 module 加载状态字典
+
+        # Update server-side global model
+        if isinstance(net_glob_server, torch.nn.DataParallel):
+            # 如果模型是 DataParallel 包装的，使用 module 加载状态字典
+            net_glob_server.module.load_state_dict(w_glob_server)
+        else:
+            net_glob_server.load_state_dict(w_glob_server)
+
+        train_time = time.time() - start_time # 新增：计算当前轮次的训练时间
+        train_times.append(train_time) # 新增：将当前轮次的训练时间添加到列表中
 
         print("====================== PipeSFL V1 ========================")
-        print('========== Train: Round {:3d} Time: {:2f}s ==============='.format(iter, time.time()-start_time))
+        print('========== Train: Round {:3d} Time: {:2f}s ==============='.format(iter, train_time))
         print("==========================================================")
     #===================================================================================
 
@@ -707,11 +766,58 @@ if __name__ == '__main__':
     #=============================================================================
     #                         Program Completed
     #=============================================================================
- 
 
+    # 确保输出目录存在
+    curve_dir = '../output/curve'
+    model_dir = '../output/model'
+    acc_dir = '../output/acc'
+    loss_dir = '../output/loss'
 
+    for directory in [curve_dir, model_dir, acc_dir, loss_dir]:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
+    # 绘制训练时间曲线
+    plt.plot(range(epochs), train_times)
+    plt.xlabel('Training Rounds')
+    plt.ylabel('Training Time (s)')
+    plt.title('Training Time Curve')
+    plt.grid(True)
+    # 保存图片 按照当前时间保存 目录为 output/curve
+    curve_filename = os.path.join(curve_dir,
+                                  'train_time_curve' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
+    plt.savefig(curve_filename)
 
+    # 保存模型 命名为 模型名+当前时间
+    client_model_filename = os.path.join(model_dir, 'PipeSFLV1_ResNet50_Cifar100_Client' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                         time.localtime()) + '.pth')
+    server_model_filename = os.path.join(model_dir, 'PipeSFLV1_ResNet50_Cifar100_Server' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                         time.localtime()) + '.pth')
+    torch.save(net_glob_client.state_dict(), client_model_filename)
+    torch.save(net_glob_server.state_dict(), server_model_filename)
+    print('Model saved successfully!')
 
-
-
+    # 保存acc和loss数据
+    acc_train_df = pd.DataFrame(acc_train_collect)
+    loss_train_df = pd.DataFrame(loss_train_collect)
+    acc_test_df = pd.DataFrame(acc_test_collect)
+    loss_test_df = pd.DataFrame(loss_test_collect)
+    # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
+    acc_train_filename = os.path.join(acc_dir, 'PipeSFLV1_ResNet50_Cifar100_Client_Acc' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                        time.localtime()) + '.csv')
+    acc_train_df.to_csv(acc_train_filename, index=False)
+    # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
+    loss_train_filename = os.path.join(loss_dir,
+                                       'PipeSFLV1_ResNet50_Cifar100_Client_Loss' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                 time.localtime()) + '.csv')
+    loss_train_df.to_csv(loss_train_filename, index=False)
+    # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
+    acc_test_filename = os.path.join(acc_dir, 'PipeSFLV1_ResNet50_Cifar100_Server_Acc' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                       time.localtime()) + '.csv')
+    acc_test_df.to_csv(acc_test_filename, index=False)
+    # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
+    loss_test_filename = os.path.join(loss_dir,
+                                      'PipeSFLV1_ResNet50_Cifar100_Server_Loss' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                time.localtime()) + '.csv')
+    loss_test_df.to_csv(loss_test_filename, index=False)
+    print('Data saved successfully!')

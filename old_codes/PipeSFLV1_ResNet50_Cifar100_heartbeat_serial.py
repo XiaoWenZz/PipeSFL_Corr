@@ -1,7 +1,7 @@
 from matplotlib import pyplot as plt
 # =============================================================================
 # SplitfedV2 (SFLV2) learning: ResNet18 on HAM10000
-# HAM10000 dataset: Tschandl, P.: The HAM10000 dataset, a large collection of multi - source dermatoscopic images of common pigmented skin lesions (2018), doi:10.7910/DVN/DBW86T
+# HAM10000 dataset: Tschandl, P.: The HAM10000 dataset, a large collection of multi-source dermatoscopic images of common pigmented skin lesions (2018), doi:10.7910/DVN/DBW86T
 
 # We have three versions of our implementations
 # Version1: without using socket and no DP+PixelDP
@@ -250,7 +250,6 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     # server_result_queue.put(dfx_client.to('cuda:'+str(idx)))
     return dfx_client, net_glob_server
 
-
 # Server-side functions associated with Testing
 def evaluate_server(fx_client, y, idx, len_batch, ell):
     global net_glob_server, criterion, batch_acc_test, batch_loss_test
@@ -317,7 +316,6 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
 
     return
 
-
 # 在全局作用域中定义新的全局变量
 acc_avg_all_user_train_global = 0
 loss_avg_all_user_train_global = 0
@@ -336,7 +334,6 @@ class DatasetSplit(Dataset):
     def __getitem__(self, item):
         image, label = self.dataset[self.idxs[item]]
         return image, label
-
 
 # Client-side functions associated with Training and Testing
 class Client(object):
@@ -463,7 +460,7 @@ if __name__ == '__main__':
     print(f"Available GPUs: {available_gpus}")
 
     # ===================================================================
-    program = "PipeSFLV1 ResNet50 on HAM10000"
+    program = "PipeSFLV1 ResNet50 on Cifar100"
     print(f"---------{program}----------")  # this is to identify the program in the slurm outputs files
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -481,7 +478,7 @@ if __name__ == '__main__':
     net_glob_client = net_glob_client.to('cuda:0')  # 添加这一行将模型移动到 GPU
     print(net_glob_client)
 
-    net_glob_server = ResNet50_server_side(7)  # 7 是 HAM10000 的类别数
+    net_glob_server = ResNet50_server_side(100)  # 7 is my numbr of classes
     net_glob_server = net_glob_server.to('cuda:0')  # 添加这一行将模型移动到 GPU
     print(net_glob_server)
 
@@ -523,76 +520,24 @@ if __name__ == '__main__':
     # =============================================================================
     #                         Data preprocessing
     # =============================================================================
-    # 读取 HAM10000 元数据
-    df = pd.read_csv('data/HAM10000/HAM10000_metadata.csv')
-
-    lesion_type = {
-        'nv': 'Melanocytic nevi',
-        'mel': 'Melanoma',
-        'bkl': 'Benign keratosis-like lesions ',
-        'bcc': 'Basal cell carcinoma',
-        'akiec': 'Actinic keratoses',
-        'vasc': 'Vascular lesions',
-        'df': 'Dermatofibroma'
-    }
-
-    # 合并 HAM1000 数据集的两个文件夹（part1 和 part2）到一个目录
-    imageid_path = {os.path.splitext(os.path.basename(x))[0]: x
-                    for x in glob(os.path.join("data/HAM10000", '*', '*.jpg'))}
-
-    df['path'] = df['image_id'].map(imageid_path.get)
-    df['cell_type'] = df['dx'].map(lesion_type.get)
-    df['target'] = pd.Categorical(df['cell_type']).codes
-
-    # 自定义 HAM10000 数据集类
-    class HAM10000Dataset(Dataset):
-        def __init__(self, df, transform=None):
-            self.df = df
-            self.transform = transform
-
-        def __len__(self):
-            return len(self.df)
-
-        def __getitem__(self, index):
-            X = Image.open(self.df['path'][index]).resize((64, 64))
-            y = torch.tensor(int(self.df['target'][index]))
-
-            if self.transform:
-                X = self.transform(X)
-
-            return X, y
-
-    # 数据预处理
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-
-    train_transforms = transforms.Compose([
+    # Data preprocessing: Transformation
+    image_size = 32
+    normalize = transforms.Normalize(mean=[0.491, 0.482, 0.447], std=[0.247, 0.243, 0.262])
+    train_transform = transforms.Compose([
+        transforms.RandomCrop(image_size, padding=4),
         transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.Pad(3),
-        transforms.RandomRotation(10),
-        transforms.CenterCrop(64),
         transforms.ToTensor(),
-        transforms.Normalize(mean=mean, std=std)
+        normalize,
+    ])
+    test_transform = transforms.Compose([
+        transforms.ToTensor(),
+        normalize,
     ])
 
-    test_transforms = transforms.Compose([
-        transforms.Pad(3),
-        transforms.CenterCrop(64),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=mean, std=std)
-    ])
-
-    # 划分训练集和测试集
-    train_df, test_df = train_test_split(df, test_size=0.2, random_state=42)
-
-    # 重置索引
-    train_df = train_df.reset_index(drop=True)
-    test_df = test_df.reset_index(drop=True)
-
-
-    dataset_train = HAM10000Dataset(train_df, transform=train_transforms)
-    dataset_test = HAM10000Dataset(test_df, transform=test_transforms)
+    train_directory = os.path.join('../data/cifar-100-python', 'train1')
+    valid_directory = os.path.join('../data/cifar-100-python', 'val')
+    dataset_train = datasets.ImageFolder(root=train_directory, transform=train_transform)
+    dataset_test = datasets.ImageFolder(root=valid_directory, transform=test_transform)
 
     # ----------------------------------------------------------------
     dict_users = dataset_iid(dataset_train, num_users)
@@ -652,10 +597,10 @@ if __name__ == '__main__':
     print("Training and Evaluation completed!")
 
     # 确保输出目录存在
-    curve_dir = 'output/curve'
-    model_dir = 'output/model'
-    acc_dir = 'output/acc'
-    loss_dir = 'output/loss'
+    curve_dir = '../output/curve'
+    model_dir = '../output/model'
+    acc_dir = '../output/acc'
+    loss_dir = '../output/loss'
 
     for directory in [curve_dir, model_dir, acc_dir, loss_dir]:
         if not os.path.exists(directory):
@@ -673,10 +618,10 @@ if __name__ == '__main__':
     plt.savefig(curve_filename)
 
     # 保存模型 命名为 模型名+当前时间
-    client_model_filename = os.path.join(model_dir, 'PipeSFLV1_ResNet50_HAM10000_Client' + time.strftime("%Y%m%d%H%M%S",
-                                                                                                         time.localtime()) + '.pth')
-    server_model_filename = os.path.join(model_dir, 'PipeSFLV1_ResNet50_HAM10000_Server' + time.strftime("%Y%m%d%H%M%S",
-                                                                                                         time.localtime()) + '.pth')
+    client_model_filename = os.path.join(model_dir, 'PipeSFLV1_ResNet50_Cifar100_Client' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                          time.localtime()) + '.pth')
+    server_model_filename = os.path.join(model_dir, 'PipeSFLV1_ResNet50_Cifar100_Server' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                          time.localtime()) + '.pth')
     torch.save(net_glob_client.state_dict(), client_model_filename)
     torch.save(net_glob_server.state_dict(), server_model_filename)
     print('Model saved successfully!')
@@ -693,21 +638,21 @@ if __name__ == '__main__':
     loss_test_df = pd.DataFrame(loss_test_collect_list)
 
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
-    acc_train_filename = os.path.join(acc_dir, 'PipeSFLV1_ResNet50_HAM10000_Client_Acc' + time.strftime("%Y%m%d%H%M%S",
-                                                                                                        time.localtime()) + '.csv')
+    acc_train_filename = os.path.join(acc_dir, 'PipeSFLV1_ResNet50_Cifar100_Client_Acc' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                         time.localtime()) + '.csv')
     acc_train_df.to_csv(acc_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
     loss_train_filename = os.path.join(loss_dir,
-                                       'PipeSFLV1_ResNet50_HAM10000_Client_Loss' + time.strftime("%Y%m%d%H%M%S",
+                                       'PipeSFLV1_ResNet50_Cifar100_Client_Loss' + time.strftime("%Y%m%d%H%M%S",
                                                                                                  time.localtime()) + '.csv')
     loss_train_df.to_csv(loss_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
-    acc_test_filename = os.path.join(acc_dir, 'PipeSFLV1_ResNet50_HAM10000_Server_Acc' + time.strftime("%Y%m%d%H%M%S",
-                                                                                                       time.localtime()) + '.csv')
+    acc_test_filename = os.path.join(acc_dir, 'PipeSFLV1_ResNet50_Cifar100_Server_Acc' + time.strftime("%Y%m%d%H%M%S",
+                                                                                                        time.localtime()) + '.csv')
     acc_test_df.to_csv(acc_test_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
     loss_test_filename = os.path.join(loss_dir,
-                                      'PipeSFLV1_ResNet50_HAM10000_Server_Loss' + time.strftime("%Y%m%d%H%M%S",
+                                      'PipeSFLV1_ResNet50_Cifar100_Server_Loss' + time.strftime("%Y%m%d%H%M%S",
                                                                                                 time.localtime()) + '.csv')
     loss_test_df.to_csv(loss_test_filename, index=False)
     print('Data saved successfully!')
@@ -715,4 +660,3 @@ if __name__ == '__main__':
     # 结束心跳监测进程
     monitor_process.terminate()
     monitor_process.join()
-    
