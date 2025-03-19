@@ -884,7 +884,7 @@ if __name__ == '__main__':
     loss_test_df = pd.DataFrame(loss_test_collect_list)
 
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
-    acc_train_filename = os.path.join(acc_dir, f'PipeSFLV1_no_Corr_ResNet50_HAM10000_Client_ep{args.epochs}_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+    acc_train_filename = os.path.join(acc_dir, f'PipeSFLV1_no_Corr_ResNet50_HAM10000_Client_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
                                                                                                         time.localtime()) + '.csv')
     acc_train_df.to_csv(acc_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
