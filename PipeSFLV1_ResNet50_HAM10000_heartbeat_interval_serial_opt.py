@@ -449,7 +449,7 @@ class Client(object):
 
     def stop_heartbeat(self):
         """停止心跳线程"""
-        self.heartbeat_running = False
+        self.running.value = False
         if self.heartbeat_thread.is_alive():
             self.heartbeat_thread.join()  # 等待线程结束
 
