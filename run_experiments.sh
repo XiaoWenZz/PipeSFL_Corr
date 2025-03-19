@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python_path="D:/Anaconda/envs/pytorch/python.exe"
+python_path="D:/Anaconda3/envs/pytorch/python.exe"
 python_file="PipeSFLV1_ResNet50_HAM10000_heartbeat_interval_serial_opt.py"
 
 for epochs in 30 50 100; do
