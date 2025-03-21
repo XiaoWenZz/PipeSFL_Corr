@@ -814,10 +814,10 @@ if __name__ == '__main__':
     print("Training and Evaluation completed!")
 
     # 确保输出目录存在
-    curve_dir = 'output/curve'
-    model_dir = 'output/model'
-    acc_dir = 'output/acc'
-    loss_dir = 'output/loss'
+    curve_dir = 'output/curve/MNIST'
+    model_dir = 'output/model/MNIST'
+    acc_dir = 'output/acc/MNIST'
+    loss_dir = 'output/loss/MNIST'
 
     for directory in [curve_dir, model_dir, acc_dir, loss_dir]:
         if not os.path.exists(directory):

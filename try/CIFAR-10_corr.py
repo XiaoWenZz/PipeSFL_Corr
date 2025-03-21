@@ -624,7 +624,7 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=30, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
     parser.add_argument('--disconnect_prob', type=float, default=0.03, help='Disconnect probability')
     args = parser.parse_args()
 
@@ -816,10 +816,10 @@ if __name__ == '__main__':
     print("Training and Evaluation completed!")
 
     # 确保输出目录存在
-    curve_dir = 'output/curve'
-    model_dir = 'output/model'
-    acc_dir = 'output/acc'
-    loss_dir = 'output/loss'
+    curve_dir = 'output/curve/cifar'
+    model_dir = 'output/model/cifar'
+    acc_dir = 'output/acc/cifar'
+    loss_dir = 'output/loss/cifar'
 
     for directory in [curve_dir, model_dir, acc_dir, loss_dir]:
         if not os.path.exists(directory):
