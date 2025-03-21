@@ -5,8 +5,8 @@ import argparse
 import numpy.random
 from matplotlib import pyplot as plt
 # =============================================================================
-# SplitfedV2 (SFLV2) learning: ResNet18 on HAM10000
-# HAM10000 dataset: Tschandl, P.: The HAM10000 dataset, a large collection of multi - source dermatoscopic images of common pigmented skin lesions (2018), doi:10.7910/DVN/DBW86T
+# SplitfedV2 (SFLV2) learning: ResNet18 on MNIST
+# MNIST dataset: Tschandl, P.: The MNIST dataset, a large collection of multi - source dermatoscopic images of common pigmented skin lesions (2018), doi:10.7910/DVN/DBW86T
 
 # We have three versions of our implementations
 # Version1: without using socket and no DP+PixelDP
@@ -576,7 +576,7 @@ class Client(object):
 
 # =====================================================================================================
 # dataset_iid() will create a dictionary to collect the indices of the data samples randomly for each client
-# IID HAM10000 datasets will be created based on this
+# IID MNIST datasets will be created based on this
 def dataset_iid(dataset, num_users):
     num_items = int(len(dataset) / num_users)
     dict_users, all_idxs = {}, [i for i in range(len(dataset))]
@@ -641,7 +641,7 @@ if __name__ == '__main__':
     print(f"Available GPUs: {available_gpus}")
 
     # ===================================================================
-    program = "PipeSFLV1 ResNet50 on HAM10000"
+    program = "PipeSFLV1 ResNet50 on MNIST"
     print(f"---------{program}----------")  # this is to identify the program in the slurm outputs files
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -836,9 +836,9 @@ if __name__ == '__main__':
     plt.clf()  # 清除当前图形
 
     # 保存模型 命名为 模型名+当前时间
-    client_model_filename = os.path.join(model_dir, f'PipeSFLV1_Corr_ResNet50_HAM10000_Client_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+    client_model_filename = os.path.join(model_dir, f'PipeSFLV1_Corr_ResNet50_MNIST_Client_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
                                                                                                          time.localtime()) + '.pth')
-    server_model_filename = os.path.join(model_dir, f'PipeSFLV1_Corr_ResNet50_HAM10000_Server_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+    server_model_filename = os.path.join(model_dir, f'PipeSFLV1_Corr_ResNet50_MNIST_Server_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
                                                                                                          time.localtime()) + '.pth')
     torch.save(net_glob_client.state_dict(), client_model_filename)
     torch.save(net_glob_server.state_dict(), server_model_filename)
@@ -859,21 +859,21 @@ if __name__ == '__main__':
     loss_test_df = pd.DataFrame(loss_test_collect_list)
 
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
-    acc_train_filename = os.path.join(acc_dir, f'PipeSFLV1_Corr_ResNet50_HAM10000_Client_Acc_ep{args.epochs}_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+    acc_train_filename = os.path.join(acc_dir, f'PipeSFLV1_Corr_ResNet50_MNIST_Client_Acc_ep{args.epochs}_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
                                                                                                         time.localtime()) + '.csv')
     acc_train_df.to_csv(acc_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
     loss_train_filename = os.path.join(loss_dir,
-                                       f'PipeSFLV1_Corr_ResNet50_HAM10000_Client_Loss_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+                                       f'PipeSFLV1_Corr_ResNet50_MNIST_Client_Loss_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
                                                                                                  time.localtime()) + '.csv')
     loss_train_df.to_csv(loss_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
-    acc_test_filename = os.path.join(acc_dir, f'PipeSFLV1_Corr_ResNet50_HAM10000_Server_Acc_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+    acc_test_filename = os.path.join(acc_dir, f'PipeSFLV1_Corr_ResNet50_MNIST_Server_Acc_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
                                                                                                        time.localtime()) + '.csv')
     acc_test_df.to_csv(acc_test_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
     loss_test_filename = os.path.join(loss_dir,
-                                      f'PipeSFLV1_Corr_ResNet50_HAM10000_Server_Loss_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+                                      f'PipeSFLV1_Corr_ResNet50_MNIST_Server_Loss_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
                                                                                                 time.localtime()) + '.csv')
     loss_test_df.to_csv(loss_test_filename, index=False)
 
