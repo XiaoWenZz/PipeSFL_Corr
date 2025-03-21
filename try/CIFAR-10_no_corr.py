@@ -614,7 +614,7 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=80, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=30, help='Number of epochs')
     parser.add_argument('--disconnect_prob', type=float, default=0.03, help='Disconnect probability')
     args = parser.parse_args()
 
