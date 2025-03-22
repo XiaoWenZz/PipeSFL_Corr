@@ -817,6 +817,13 @@ if __name__ == '__main__':
 
         if len(w_locals_client) == 0:
             print("No clients available for Federated Learning!")
+            # acc_train_collect和loss_train_collect中添加和前一项相同的值
+            if len(acc_train_collect) > 0:
+                acc_train_collect.append(acc_train_collect[-1])
+                loss_train_collect.append(loss_train_collect[-1])
+            else:
+                acc_train_collect.append(0)
+                loss_train_collect.append(0)
         else:
             # 客户端联邦平均
             w_glob_client = FedAvg(w_locals_client, model_type='client')
