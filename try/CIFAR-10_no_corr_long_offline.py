@@ -402,7 +402,8 @@ class Client(object):
         self.status = "idle"  # idle, training, testing
         self.heartbeat_interval = 5  # 5秒心跳间隔
         # 心跳线程在初始化最后启动（确保属性已创建）
-        self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
+        # self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
+        self.heartbeat_thread = multiprocessing.Process(target=self.send_heartbeat)
         self.heartbeat_thread.start()
 
     def send_heartbeat(self):
