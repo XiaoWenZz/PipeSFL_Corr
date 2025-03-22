@@ -400,7 +400,7 @@ class Client(object):
         self.running = running
         # 新增心跳管理
         self.status = "idle"  # idle, training, testing
-        self.heartbeat_interval =2  # 2秒心跳间隔
+        self.heartbeat_interval =5  # 5秒心跳间隔
         self.stop_heartbeat_flag = False
         # 心跳线程在初始化最后启动（确保属性已创建）
         # self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
@@ -655,7 +655,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Training script')
     parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
-    parser.add_argument('--disconnect_prob', type=float, default=0.2, help='Disconnect probability')
+    parser.add_argument('--disconnect_prob', type=float, default=0.05, help='Disconnect probability')
     args = parser.parse_args()
 
     SEED = 1234
