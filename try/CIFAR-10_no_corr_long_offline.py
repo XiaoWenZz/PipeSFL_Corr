@@ -401,6 +401,7 @@ class Client(object):
         # 新增心跳管理
         self.status = "idle"  # idle, training, testing
         self.heartbeat_interval =2  # 2秒心跳间隔
+        self.stop_heartbeat_flag = False
         # 心跳线程在初始化最后启动（确保属性已创建）
         # self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
         self.heartbeat_thread = multiprocessing.Process(target=self.send_heartbeat)
@@ -409,7 +410,7 @@ class Client(object):
     def send_heartbeat(self):
         try:
             while self.running.value:
-                if not self.is_disconnected:
+                if not self.is_disconnected and not self.stop_heartbeat_flag:
                     # 仅在未断开时检查是否断开
                     random_num = numpy.random.random()
                     self.is_disconnected = random_num < self.disconnect_prob and self.status != "idle"
