@@ -807,9 +807,9 @@ if __name__ == '__main__':
                 # Testing -------------------
                 local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
 
-                # 新增：停止当前客户端心跳
-                local.stop_heartbeat()
-                del local  # 确保资源释放
+            # 新增：停止当前客户端心跳
+            local.stop_heartbeat()
+            del local  # 确保资源释放
 
         running.value = False
 
