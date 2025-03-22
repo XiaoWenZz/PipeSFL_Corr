@@ -178,7 +178,7 @@ def calculate_accuracy(fx, y):
 # Server-side function associated with Training
 def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_server, lr, criterion,
                  batch_acc_train, batch_loss_train, count1, loss_train_collect_user, acc_train_collect_user,
-                 idx_collect, idx_disconnected,
+                 idx_collect, idx_disconnected, idx_round_disconnected,
                  num_users):
     global l_epoch_check, fed_check
     net_glob_server = net_glob_server.to('cuda:0')  # 将模型移到 GPU 上
@@ -256,7 +256,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
         print(f"[Debug] idx_disconnected: {idx_disconnected}")
 
         # This is to check if all users are served for one round --------------------
-        if len(idx_collect) + len(idx_disconnected) == num_users:
+        if len(idx_collect) + len(idx_round_disconnected) == num_users:
             fed_check = True  # to evaluate_server function  - to check fed check has hitted
             # all users served for one round ------------------------- output print and update is done in evaluate_server()
             # for nicer display
@@ -376,7 +376,7 @@ class DatasetSplit(Dataset):
 # Client-side functions associated with Training and Testing
 class Client(object):
     def __init__(self, net_client_model, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users, running,
-                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.001, idx_disconnected=None, is_disconnected=False, idx_disconnected_time=None):
+                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.001, idx_disconnected=None, is_disconnected=False, idx_disconnected_time=None, idx_round_disconnected=None):
         self.disconnect_prob = disconnect_prob  # 断开概率
         self.is_disconnected = is_disconnected  # 是否断开
         self.heartbeat_queue = heartbeat_queue
@@ -398,6 +398,7 @@ class Client(object):
         self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size=512, shuffle=True)
 
         self.idx_disconnected = idx_disconnected
+        self.idx_round_disconnected = idx_round_disconnected
         self.idx_disconnected_time = idx_disconnected_time
         self.running = running
         # 新增心跳管理
@@ -430,6 +431,7 @@ class Client(object):
                                 print(f"[Warning] Client{self.idx} 在idx_collect中，可能存在竞态条件")
                             else:
                                 idx_disconnected.append(self.idx)
+                                idx_round_disconnected.append(self.idx)
 
                         idx_disconnected_time[self.idx] = 10  # 设置倒计时为 10
                         time.sleep(self.heartbeat_interval)
@@ -459,7 +461,7 @@ class Client(object):
     def update_fed_check(self):
         """新增鲁棒性保证 如果最后一个client在训练时退出将导致fed_check无法置为True 在这里再做一次检查"""
         global l_epoch_check, fed_check
-        if len(self.idx_collect) + len(self.idx_disconnected) == self.num_users:
+        if len(self.idx_collect) + len(self.idx_round_disconnected) == self.num_users:
             fed_check = True
             # 确保列表中有数据再计算平均
             if len(self.acc_train_collect_user) > 0:
@@ -549,7 +551,7 @@ class Client(object):
                                                             self.lr, self.criterion, self.batch_acc_train,
                                                             self.batch_loss_train, self.count1,
                                                             self.loss_train_collect_user,
-                                                            self.acc_train_collect_user, self.idx_collect, self.idx_disconnected,
+                                                            self.acc_train_collect_user, self.idx_collect, self.idx_disconnected, self.idx_round_disconnected,
                                                             self.num_users)
 
                         fx.backward(dfx)
@@ -722,6 +724,7 @@ if __name__ == '__main__':
     # client idx collector
     idx_collect = manager.list()
     idx_disconnected = manager.list()
+    idx_round_disconnected = manager.list()
 
     # long offline 修改点一 新增数据结构 idx_disconnected_time
     idx_disconnected_time = manager.list([0] * num_users)  # 初始化倒计时列表
@@ -781,8 +784,9 @@ if __name__ == '__main__':
     # this epoch is global epoch, also known as rounds
 
     for iter in range(epochs):
-        # 清空idx_collect
+        # 清空idx_collect 和 idx_round_disconnected
         idx_collect[:] = []
+        idx_round_disconnected[:] = []
         start_time = time.time()
         m = max(int(frac * num_users), 1)
         idxs_users = np.random.choice(range(num_users), m, replace=False)
