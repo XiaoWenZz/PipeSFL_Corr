@@ -785,6 +785,8 @@ if __name__ == '__main__':
         w_locals_client = []
         w_glob_server_buffer = []
 
+        running.value = True
+
         for idx in idxs_users:
             if idx in idx_disconnected:
                 local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
@@ -825,6 +827,8 @@ if __name__ == '__main__':
                 # 新增：停止当前客户端心跳
                 local.stop_heartbeat()
                 del local  # 确保资源释放
+
+        running.value = False
 
         # Federation process at Client-Side------------------------
         print("------------------------------------------------------------")
@@ -956,8 +960,6 @@ if __name__ == '__main__':
                                        f'loss_curve_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S", time.localtime()) + '.png')
     plt.savefig(loss_curve_filename)
     print('Data saved successfully!')
-
-    running.value = False
 
     # 结束心跳监测进程
     monitor_process.terminate()
