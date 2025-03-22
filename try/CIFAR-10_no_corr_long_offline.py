@@ -480,6 +480,8 @@ class Client(object):
             print('[update_fed_check] current idx_collect:', self.idx_collect)
             print('[update_fed_check] current idx_disconnected:', self.idx_disconnected)
             loss_train_collect.append(loss_avg_all_user_train)
+            acc_test_collect.append(acc_test_collect[-1])
+            loss_test_collect.append(loss_test_collect[-1])
         return None, None
 
     def train(self, net):
