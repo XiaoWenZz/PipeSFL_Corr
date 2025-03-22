@@ -803,13 +803,13 @@ if __name__ == '__main__':
                                dataset_train=dataset_train,
                                dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
                                heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob,
-                               idx_disconnected=idx_disconnected, running=running, is_disconnected=True, idx_disconnected_time=idx_disconnected_time)
+                               idx_disconnected=idx_disconnected, running=running, is_disconnected=True, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected)
             else:
                 local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
                                dataset_train=dataset_train,
                                dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
                                heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob,
-                               idx_disconnected=idx_disconnected, running=running, is_disconnected=False, idx_disconnected_time=idx_disconnected_time)
+                               idx_disconnected=idx_disconnected, running=running, is_disconnected=False, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected)
 
             # Training ------------------
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
