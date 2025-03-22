@@ -408,7 +408,8 @@ class Client(object):
 
     def send_heartbeat(self):
         try:
-            while self.running.value and not self.stop_heartbeat_flag:
+            # while self.running.value and not self.stop_heartbeat_flag:
+            while not self.stop_heartbeat_flag:
                 if not self.is_disconnected:
                     # 仅在未断开时检查是否断开
                     random_num = numpy.random.random()
