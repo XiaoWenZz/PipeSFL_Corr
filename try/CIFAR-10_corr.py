@@ -577,12 +577,32 @@ class Client(object):
 # =====================================================================================================
 # dataset_iid() will create a dictionary to collect the indices of the data samples randomly for each client
 # IID CIFAR-10 datasets will be created based on this
+# def dataset_iid(dataset, num_users):
+#     num_items = int(len(dataset) / num_users)
+#     dict_users, all_idxs = {}, [i for i in range(len(dataset))]
+#     for i in range(num_users):
+#         dict_users[i] = set(np.random.choice(all_idxs, num_items, replace=False))
+#         all_idxs = list(set(all_idxs) - dict_users[i])
+#     return dict_users
+
 def dataset_iid(dataset, num_users):
-    num_items = int(len(dataset) / num_users)
-    dict_users, all_idxs = {}, [i for i in range(len(dataset))]
-    for i in range(num_users):
-        dict_users[i] = set(np.random.choice(all_idxs, num_items, replace=False))
-        all_idxs = list(set(all_idxs) - dict_users[i])
+    # 获取数据集中的标签列表
+    labels = [label for _, label in dataset]
+    # 统计每个类别的样本索引
+    class_idxs = {i: [] for i in range(10)}  # CIFAR-10有10个类别
+    for idx, label in enumerate(labels):
+        class_idxs[label].append(idx)
+
+    dict_users = {}
+    num_per_class = len(class_idxs[0]) // num_users  # 假设每个类别的样本数相同
+
+    for user in range(num_users):
+        dict_users[user] = set()
+        for class_idx in class_idxs:
+            start = user * num_per_class
+            end = (user + 1) * num_per_class
+            dict_users[user].update(class_idxs[class_idx][start:end])
+
     return dict_users
 
 
