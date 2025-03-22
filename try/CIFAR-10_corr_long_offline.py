@@ -400,7 +400,7 @@ class Client(object):
         self.running = running
         # 新增心跳管理
         self.status = "idle"  # idle, training, testing
-        self.heartbeat_interval = 5  # 5秒心跳间隔
+        self.heartbeat_interval = 2  # 2秒心跳间隔
         self.stop_heartbeat_flag = False
         # 心跳线程在初始化最后启动（确保属性已创建）
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)

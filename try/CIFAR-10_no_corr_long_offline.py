@@ -400,7 +400,7 @@ class Client(object):
         self.running = running
         # 新增心跳管理
         self.status = "idle"  # idle, training, testing
-        self.heartbeat_interval =5  # 5秒心跳间隔
+        self.heartbeat_interval =2  # 2秒心跳间隔
         self.stop_heartbeat_flag = False
         # 心跳线程在初始化最后启动（确保属性已创建）
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
@@ -795,7 +795,7 @@ if __name__ == '__main__':
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
 
             if local.is_disconnected:
-                prRed(f"Client{idx} 断开连接，使用校正变量模拟更新")
+                prRed(f"Client{idx} 断开连接，不使用校正变量模拟更新，直接跳过")
                 continue
             else:
                 w_locals_client.append(w_client)  # 已在 CPU
