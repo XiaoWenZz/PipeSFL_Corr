@@ -409,7 +409,7 @@ class Client(object):
 
     def send_heartbeat(self):
         try:
-            while self.running.value:
+            while self.running.value and not self.stop_heartbeat_flag:
                 if not self.is_disconnected and not self.stop_heartbeat_flag:
                     # 仅在未断开时检查是否断开
                     random_num = numpy.random.random()
@@ -450,7 +450,7 @@ class Client(object):
 
     def stop_heartbeat(self):
         """停止心跳线程"""
-        self.running.value = False
+        self.stop_heartbeat_flag = True
         if self.heartbeat_thread.is_alive():
             self.heartbeat_thread.join()  # 等待线程结束
 
