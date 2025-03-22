@@ -855,6 +855,10 @@ if __name__ == '__main__':
                 else:
                     print(f"[Reconnect] Client{i} 重新连接倒计时: {idx_disconnected_time[i]}")
 
+        # debug
+        fed_check = False
+        print("==========================================================")
+
     # ===================================================================================
 
     print("Training and Evaluation completed!")
