@@ -274,9 +274,9 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
             loss_avg_all_user_train_global = loss_avg_all_user_train
             acc_train_collect.append(acc_avg_all_user_train)
             # for debugging print
-            print('acc_train_collect appended once, current length:', len(acc_train_collect))
-            print('current idx_collect:', idx_collect)
-            print('current idx_disconnected:', idx_disconnected)
+            print('[train_server] acc_train_collect appended once, current length:', len(acc_train_collect))
+            print('[train_server] current idx_collect:', idx_collect)
+            print('[train_server] current idx_disconnected:', idx_disconnected)
             loss_train_collect.append(loss_avg_all_user_train)
 
     # send gradients to the client
@@ -474,7 +474,9 @@ class Client(object):
             loss_avg_all_user_train_global = loss_avg_all_user_train
             acc_train_collect.append(acc_avg_all_user_train)
             # for debugging print
-            print('acc_train_collect appended once, current length:', len(acc_train_collect))
+            print('[update_fed_check] acc_train_collect appended once, current length:', len(acc_train_collect))
+            print('[update_fed_check] current idx_collect:', self.idx_collect)
+            print('[update_fed_check] current idx_disconnected:', self.idx_disconnected)
             loss_train_collect.append(loss_avg_all_user_train)
         return None, None
 
