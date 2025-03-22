@@ -275,6 +275,8 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
             acc_train_collect.append(acc_avg_all_user_train)
             # for debugging print
             print('acc_train_collect appended once, current length:', len(acc_train_collect))
+            print('current idx_collect:', idx_collect)
+            print('current idx_disconnected:', idx_disconnected)
             loss_train_collect.append(loss_avg_all_user_train)
 
     # send gradients to the client
