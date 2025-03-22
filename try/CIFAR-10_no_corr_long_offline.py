@@ -839,6 +839,8 @@ if __name__ == '__main__':
                 if idx_disconnected_time[i] == 0:
                     print(f"[Reconnect] Client{i} 将在下一轮重新连接")
                     idx_disconnected.remove(i)
+                else:
+                    print(f"[Reconnect] Client{i} 重新连接倒计时: {idx_disconnected_time[i]}")
 
     # ===================================================================================
 
