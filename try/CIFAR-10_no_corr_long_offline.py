@@ -783,6 +783,8 @@ if __name__ == '__main__':
         running.value = True
 
         for idx in idxs_users:
+            # for debugging print
+            print(f"[Round {iter}] Current user's idx: {idx}")
             if idx in idx_disconnected:
                 local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
                                dataset_train=dataset_train,
