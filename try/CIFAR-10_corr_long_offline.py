@@ -266,8 +266,12 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
                 acc_avg_all_user_train = sum(acc_train_collect_user) / len(acc_train_collect_user)
                 loss_avg_all_user_train = sum(loss_train_collect_user) / len(loss_train_collect_user)
             else:
-                acc_avg_all_user_train = 0
-                loss_avg_all_user_train = 0
+                if len(acc_train_collect) == 0:
+                    acc_avg_all_user_train = 0
+                    loss_avg_all_user_train = 0
+                else:
+                    acc_avg_all_user_train = acc_train_collect[-1]
+                    loss_avg_all_user_train = loss_train_collect[-1]
 
             global acc_avg_all_user_train_global, loss_avg_all_user_train_global
             acc_avg_all_user_train_global = acc_avg_all_user_train
