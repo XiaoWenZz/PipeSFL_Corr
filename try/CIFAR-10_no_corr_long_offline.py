@@ -807,6 +807,13 @@ if __name__ == '__main__':
 
         running.value = True
 
+        # 若idx_disconnected中有客户端且不是全部客户端都断开，则为idx_users排序，确保未断开的客户端在最后 保证eval_server时不会出错
+        # 排序逻辑 在idx_disconnected中的客户端排在最前
+        if len(idx_disconnected) > 0 and len(idx_disconnected) < num_users:
+            print(f"[sort idxs_users] sort idxs_users")
+            idxs_users = sorted(idxs_users, key=lambda x: x not in idx_disconnected)
+            print(f"[Round {iter}] Sorted idxs_users: {idxs_users}")
+
         for idx in idxs_users:
             # for debugging print
             print(f"[Round {iter}] Current user's idx: {idx}")
