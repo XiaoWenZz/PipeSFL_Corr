@@ -342,6 +342,8 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
 
                 loss_test_collect.append(loss_avg_all_user)
                 acc_test_collect.append(acc_avg_all_user)
+                # for debugging print
+                print('[evaluate_server] acc_test_collect appended once, current length:', len(acc_test_collect))
                 acc_test_collect_user = []
                 loss_test_collect_user = []
 
@@ -496,6 +498,8 @@ class Client(object):
             else:
                 acc_test_collect.append(acc_test_collect[-1])
                 loss_test_collect.append(loss_test_collect[-1])
+            # for debugging print
+            print('[update_fed_check] acc_test_collect appended once, current length:', len(acc_test_collect))
         return None, None
 
     def train(self, net):
