@@ -470,8 +470,12 @@ class Client(object):
                 acc_avg_all_user_train = sum(self.acc_train_collect_user) / len(self.acc_train_collect_user)
                 loss_avg_all_user_train = sum(self.loss_train_collect_user) / len(self.loss_train_collect_user)
             else:
-                acc_avg_all_user_train = 0
-                loss_avg_all_user_train = 0
+                if len(acc_train_collect) == 0:
+                    acc_avg_all_user_train = 0
+                    loss_avg_all_user_train = 0
+                else:
+                    acc_avg_all_user_train = acc_train_collect[-1]
+                    loss_avg_all_user_train = loss_train_collect[-1]
 
             global acc_avg_all_user_train_global, loss_avg_all_user_train_global
             acc_avg_all_user_train_global = acc_avg_all_user_train
