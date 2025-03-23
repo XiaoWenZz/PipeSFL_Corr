@@ -429,6 +429,8 @@ class Client(object):
                             # 添加检查避免竞态条件
                             if self.idx in self.idx_collect:
                                 print(f"[Warning] Client{self.idx} 在idx_collect中，可能存在竞态条件")
+                                print(f"[send_heartbeat] 触发保护机制，不将 {self.idx} 添加到 idx_disconnected")
+                                continue
                             else:
                                 idx_disconnected.append(self.idx)
                                 idx_round_disconnected.append(self.idx)
