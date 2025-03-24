@@ -402,7 +402,8 @@ class Client(object):
         # self.selected_clients = []
         self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size=512, shuffle=True)
         self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size=512, shuffle=True)
-        self.rng = numpy.random.default_rng(seed=disconnect_seed + self.idx)
+        self.disconnect_seed = disconnect_seed
+        self.rng = numpy.random.default_rng(seed=self.disconnect_seed + self.idx)
 
         self.idx_disconnected = idx_disconnected
         self.idx_round_disconnected = idx_round_disconnected
@@ -423,6 +424,8 @@ class Client(object):
                 if not self.is_disconnected:
                     # 仅在未断开时检查是否断开
                     random_num = self.rng.random()
+                    # 补充 seed
+                    self.rng = numpy.random.default_rng(seed=self.disconnect_seed + self.idx)
                     # for debugging print random number
                     print(f"[send_heartbeat] Client{self.idx} 随机数: {random_num}")
                     self.is_disconnected = random_num < self.disconnect_prob and self.status == "training"
