@@ -690,9 +690,6 @@ if __name__ == '__main__':
     parser.add_argument('--disconnect_prob', type=float, default=0.03, help='Disconnect probability')
     args = parser.parse_args()
 
-    global_seed = 42  # 可自定义种子值
-    numpy.random.seed(global_seed)
-
     SEED = 1234
     random.seed(SEED)
     np.random.seed(SEED)
@@ -821,6 +818,9 @@ if __name__ == '__main__':
         idxs_users = np.random.choice(range(num_users), m, replace=False)
         w_locals_client = []
         w_glob_server_buffer = []
+
+        global_seed = iter  # 可自定义种子值
+        numpy.random.seed(global_seed)
 
         running.value = True
 
