@@ -422,7 +422,7 @@ class Client(object):
             while not self.stop_heartbeat_flag:
                 if not self.is_disconnected:
                     # 仅在未断开时检查是否断开
-                    random_num = numpy.random.random()
+                    random_num = self.rng.random()
                     self.is_disconnected = random_num < self.disconnect_prob and self.status == "training"
                     if self.is_disconnected:
                         # for debugging print random number
