@@ -674,6 +674,10 @@ def monitor_heartbeats(heartbeat_queue, num_users):
         except Exception as e:
             print(f"[Error] An unexpected error occurred: {e}")
 
+def cleanup_client(local):
+    local.stop_heartbeat()
+    del local
+
 if __name__ == '__main__':
     torch.cuda.init()
     torch.multiprocessing.set_start_method("spawn", force=True)
@@ -850,8 +854,9 @@ if __name__ == '__main__':
                 local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
 
             # 新增：停止当前客户端心跳
-            local.stop_heartbeat()
-            del local  # 确保资源释放
+            # 在创建客户端后，使用线程执行清理操作
+            cleanup_thread = threading.Thread(target=cleanup_client, args=(local,), daemon=True)
+            cleanup_thread.start()
 
         running.value = False
 
