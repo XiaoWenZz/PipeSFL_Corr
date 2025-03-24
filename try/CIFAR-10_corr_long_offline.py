@@ -680,8 +680,8 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=150, help='Number of epochs')
-    parser.add_argument('--disconnect_prob', type=float, default=0.04, help='Disconnect probability')
+    parser.add_argument('--epochs', type=int, default=60, help='Number of epochs')
+    parser.add_argument('--disconnect_prob', type=float, default=0.03, help='Disconnect probability')
     args = parser.parse_args()
 
     SEED = 1234
