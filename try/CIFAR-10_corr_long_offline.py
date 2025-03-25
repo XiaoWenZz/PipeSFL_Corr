@@ -728,8 +728,8 @@ if __name__ == '__main__':
     print(net_glob_server)
 
     # 初始化上一轮的全局模型参数
-    prev_w_glob_client = copy.deepcopy(net_glob_client.state_dict())
-    prev_w_glob_server = copy.deepcopy(net_glob_server.state_dict())
+    prev_w_glob_client = {k: v.cpu() for k, v in copy.deepcopy(net_glob_client.state_dict()).items()}
+    prev_w_glob_server = {k: v.cpu() for k, v in copy.deepcopy(net_glob_server.state_dict()).items()}
 
     # ===================================================================================
     # For Server Side Loss and Accuracy
@@ -893,8 +893,8 @@ if __name__ == '__main__':
         running.value = False
 
         # 更新上一轮的全局模型参数
-        prev_w_glob_client = copy.deepcopy(net_glob_client.state_dict())
-        prev_w_glob_server = copy.deepcopy(net_glob_server.state_dict())
+        prev_w_glob_client = {k: v.cpu() for k, v in copy.deepcopy(net_glob_client.state_dict()).items()}
+        prev_w_glob_server = {k: v.cpu() for k, v in copy.deepcopy(net_glob_server.state_dict()).items()}
 
         # Federation process at Client-Side------------------------
         print("------------------------------------------------------------")
