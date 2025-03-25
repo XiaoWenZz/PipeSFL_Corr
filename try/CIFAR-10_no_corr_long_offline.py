@@ -691,7 +691,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Training script')
     parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
-    parser.add_argument('--disconnect_prob', type=float, default=0.1, help='Disconnect probability')
+    parser.add_argument('--disconnect_prob', type=float, default=0.05, help='Disconnect probability')
     args = parser.parse_args()
 
     SEED = 1234
