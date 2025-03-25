@@ -904,6 +904,12 @@ if __name__ == '__main__':
 
         # debug
         fed_check = False
+        print(f"[Debug] len(acc_test_collect): {len(acc_test_collect)}")
+        if len(acc_train_collect > 0):
+            if len(acc_train_collect) < iter:
+                acc_train_collect.append(acc_train_collect[-1])
+                loss_train_collect.append(loss_train_collect[-1])
+                print(f"[Debug] acc_train_collect 异常 触发保护机制 重复添加最后一个元素")
         if len(acc_test_collect) > 0:
             if len(acc_test_collect) < len(acc_train_collect):
                 acc_test_collect.append(acc_test_collect[-1])

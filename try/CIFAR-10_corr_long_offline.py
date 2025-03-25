@@ -928,6 +928,11 @@ if __name__ == '__main__':
                 acc_test_collect.append(acc_test_collect[-1])
                 loss_test_collect.append(loss_test_collect[-1])
                 print(f"[Debug] acc_test_collect 异常 触发保护机制 重复添加最后一个元素")
+        if len(acc_test_collect) > 0:
+            if len(acc_test_collect) < len(acc_train_collect):
+                acc_test_collect.append(acc_test_collect[-1])
+                loss_test_collect.append(loss_test_collect[-1])
+                print(f"[Debug] acc_test_collect 异常 触发保护机制 重复添加最后一个元素")
         print("==========================================================")
 
     # ===================================================================================
