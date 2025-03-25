@@ -985,21 +985,21 @@ if __name__ == '__main__':
     loss_test_df = pd.DataFrame(loss_test_collect_list)
 
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
-    acc_train_filename = os.path.join(acc_dir, f'Client_Acc_ep{args.epochs}_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
+    acc_train_filename = os.path.join(acc_dir, f'Client_Acc_Corr_ep{args.epochs}_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                                         time.localtime()) + '.csv')
     acc_train_df.to_csv(acc_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
     loss_train_filename = os.path.join(loss_dir,
-                                       f'Client_Loss_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
+                                       f'Client_Loss_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                                  time.localtime()) + '.csv')
     loss_train_df.to_csv(loss_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
-    acc_test_filename = os.path.join(acc_dir, f'Server_Acc_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
+    acc_test_filename = os.path.join(acc_dir, f'Server_Acc_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                                        time.localtime()) + '.csv')
     acc_test_df.to_csv(acc_test_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
     loss_test_filename = os.path.join(loss_dir,
-                                      f'Server_Loss_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
+                                      f'Server_Loss_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                                 time.localtime()) + '.csv')
     loss_test_df.to_csv(loss_test_filename, index=False)
 
