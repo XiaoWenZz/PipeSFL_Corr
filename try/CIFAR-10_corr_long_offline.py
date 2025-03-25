@@ -690,7 +690,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Training script')
     parser.add_argument('--epochs', type=int, default=150, help='Number of epochs')
-    parser.add_argument('--disconnect_prob', type=float, default=0.1    , help='Disconnect probability')
+    parser.add_argument('--disconnect_prob', type=float, default=0.2, help='Disconnect probability')
     args = parser.parse_args()
 
     SEED = 1234
@@ -923,11 +923,11 @@ if __name__ == '__main__':
         # debug
         fed_check = False
         print(f"[Debug] len(acc_test_collect): {len(acc_test_collect)}")
-        if len(acc_test_collect) > 0:
-            if len(acc_test_collect) < len(acc_train_collect):
-                acc_test_collect.append(acc_test_collect[-1])
-                loss_test_collect.append(loss_test_collect[-1])
-                print(f"[Debug] acc_test_collect 异常 触发保护机制 重复添加最后一个元素")
+        if len(acc_train_collect > 0):
+            if len(acc_train_collect) < iter + 1:
+                acc_train_collect.append(acc_train_collect[-1])
+                loss_train_collect.append(loss_train_collect[-1])
+                print(f"[Debug] acc_train_collect 异常 触发保护机制 重复添加最后一个元素")
         if len(acc_test_collect) > 0:
             if len(acc_test_collect) < len(acc_train_collect):
                 acc_test_collect.append(acc_test_collect[-1])
