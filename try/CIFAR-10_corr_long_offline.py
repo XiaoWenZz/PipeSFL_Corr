@@ -923,7 +923,7 @@ if __name__ == '__main__':
         # debug
         fed_check = False
         print(f"[Debug] len(acc_test_collect): {len(acc_test_collect)}")
-        if len(acc_train_collect > 0):
+        if len(acc_train_collect) > 0:
             if len(acc_train_collect) < iter + 1:
                 acc_train_collect.append(acc_train_collect[-1])
                 loss_train_collect.append(loss_train_collect[-1])
