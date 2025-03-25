@@ -727,6 +727,10 @@ if __name__ == '__main__':
     net_glob_server = ResNet50_server_side(10).cpu()
     print(net_glob_server)
 
+    # 初始化上一轮的全局模型参数
+    prev_w_glob_client = copy.deepcopy(net_glob_client.state_dict())
+    prev_w_glob_server = copy.deepcopy(net_glob_server.state_dict())
+
     # ===================================================================================
     # For Server Side Loss and Accuracy
     loss_train_collect = manager.list()
@@ -857,7 +861,13 @@ if __name__ == '__main__':
 
             if local.is_disconnected:
                 prRed(f"Client{idx} 断开连接，使用校正变量模拟更新")
-                continue
+                # 离线客户端使用上一轮的全局模型参数减去校正项
+                offline_w_client = {k: prev_w_glob_client[k] - client_corrections[idx][k] for k in
+                                    prev_w_glob_client.keys()}
+                offline_w_glob_server = {k: prev_w_glob_server[k] - server_corrections[idx][k] for k in
+                                         prev_w_glob_server.keys()}
+                w_locals_client.append(offline_w_client)
+                w_glob_server_buffer.append(offline_w_glob_server)
             else:
                 w_locals_client.append(w_client)  # 已在 CPU
                 w_glob_server_buffer.append(w_glob_server)  # 已在 CPU
@@ -881,6 +891,10 @@ if __name__ == '__main__':
             cleanup_thread.start()
 
         running.value = False
+
+        # 更新上一轮的全局模型参数
+        prev_w_glob_client = copy.deepcopy(net_glob_client.state_dict())
+        prev_w_glob_server = copy.deepcopy(net_glob_server.state_dict())
 
         # Federation process at Client-Side------------------------
         print("------------------------------------------------------------")
