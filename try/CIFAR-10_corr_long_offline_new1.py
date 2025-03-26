@@ -900,8 +900,10 @@ if __name__ == '__main__':
             if local.is_disconnected:
                 prRed(f"Client{idx} 断开连接，使用校正变量模拟更新")
                 # 离线客户端使用上一轮的全局模型参数减去校正项
-                offline_w_client = {k: prev_w_glob_client[k] - client_corrections[idx][k] for k in
-                                    prev_w_glob_client.keys()}
+                # 对离线客户端使用动量校正
+                offline_w_client = {
+                    k: 0.9 * prev_w_glob_client[k] + 0.1 * (prev_w_glob_client[k] - client_corrections[idx][k])}
+
                 offline_w_glob_server = {k: prev_w_glob_server[k] - server_corrections[idx][k] for k in
                                          prev_w_glob_server.keys()}
                 w_locals_client.append(offline_w_client)
@@ -913,12 +915,13 @@ if __name__ == '__main__':
                 # 客户端训练后，更新客户端校正项
                 global_update_client = net_glob_client.state_dict()
                 for k in global_update_client.keys():
-                    client_corrections[idx][k] = global_update_client[k] - w_client[k]
+                    # 对校正项进行数值裁剪
+                    client_corrections[idx][k] = torch.clamp(global_update_client[k] - w_client[k], -1e3, 1e3)
 
                 # 服务器端训练后，更新服务器端校正项
                 global_update_server = net_glob_server.state_dict()
                 for k in global_update_server.keys():
-                    server_corrections[idx][k] = global_update_server[k] - w_glob_server[k]
+                    server_corrections[idx][k] = torch.clamp(global_update_server[k] - w_glob_server[k], -1e3, 1e3)
 
                 # Testing -------------------
                 local.evaluate(w_client, ell=iter)
