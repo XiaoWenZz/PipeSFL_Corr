@@ -66,11 +66,17 @@ class BasicBlock(nn.Module):
             )
 
     def forward(self, x):
-        out = torch.relu(self.bn1(self.conv1(x)))
-        out = torch.relu(self.bn2(self.conv2(out)))
+        # 激活函数使用LeakyReLU
+        # out = torch.relu(self.bn1(self.conv1(x)))
+        # out = torch.relu(self.bn2(self.conv2(out)))
+        # out = self.bn3(self.conv3(out))
+        # out += self.shortcut(x)
+        # out = torch.relu(out)
+        out = F.leaky_relu(self.bn1(self.conv1(x)))
+        out = F.leaky_relu(self.bn2(self.conv2(out)))
         out = self.bn3(self.conv3(out))
         out += self.shortcut(x)
-        out = torch.relu(out)
+        out = F.leaky_relu(out)
         return out
 
 
