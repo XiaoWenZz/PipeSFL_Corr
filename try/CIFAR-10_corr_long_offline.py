@@ -134,6 +134,39 @@ class ResNet50_server_side(nn.Module):
 #                                  Server Side Programs
 # ====================================================================================================
 # Federated averaging: FedAvg
+# def FedAvg(w, corrections, model_type):
+#     """
+#     model_type: 'client' 或 'server'，用于选择对应参数键
+#     """
+#     if not w:
+#         return {}
+#
+#     # 根据模型类型获取基准参数
+#     if model_type == 'client':
+#         w_avg = copy.deepcopy(w[0])
+#         param_keys = net_glob_client.state_dict().keys()
+#     elif model_type == 'server':
+#         w_avg = copy.deepcopy(w[0])
+#         param_keys = net_glob_server.state_dict().keys()
+#     else:
+#         raise ValueError("Invalid model_type")
+#
+#     if len(w) == 1:
+#         # 如果只有一个元素，直接返回该元素的深拷贝
+#         return w_avg
+#
+#     for k in param_keys:
+#         total = w_avg[k].clone()
+#         for i, params in enumerate(w[1:], start=1):
+#             # 防御性编程：确保参数在corrections中存在
+#             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
+#             if i not in idx_disconnected:
+#                 total += params[k].cpu()
+#             else:
+#                 total += params[k].cpu() - corr.cpu()
+#         w_avg[k] = total / len(w)
+#     return w_avg
+
 def FedAvg(w, corrections, model_type):
     """
     model_type: 'client' 或 'server'，用于选择对应参数键
@@ -155,11 +188,21 @@ def FedAvg(w, corrections, model_type):
         # 如果只有一个元素，直接返回该元素的深拷贝
         return w_avg
 
+    max_corr_value = 1e3  # 定义最大校正值
     for k in param_keys:
         total = w_avg[k].clone()
         for i, params in enumerate(w[1:], start=1):
             # 防御性编程：确保参数在corrections中存在
             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
+
+            # 检查corrections值是否为nan或inf
+            if torch.isnan(corr).any() or torch.isinf(corr).any():
+                print(f"[Warning] Client {i} 的 {k} 参数的校正值存在 nan 或 inf，将使用零校正值")
+                corr = torch.zeros_like(corr)
+
+            # 限制校正值的大小
+            corr = torch.clamp(corr, -max_corr_value, max_corr_value)
+
             if i not in idx_disconnected:
                 total += params[k].cpu()
             else:
