@@ -72,11 +72,12 @@ class BasicBlock(nn.Module):
         # out = self.bn3(self.conv3(out))
         # out += self.shortcut(x)
         # out = torch.relu(out)
-        out = F.leaky_relu(self.bn1(self.conv1(x)))
-        out = F.leaky_relu(self.bn2(self.conv2(out)))
+        LeakyReLu = nn.LeakyReLU()
+        out = LeakyReLu(self.bn1(self.conv1(x)))
+        out = LeakyReLu(self.bn2(self.conv2(out)))
         out = self.bn3(self.conv3(out))
         out += self.shortcut(x)
-        out = F.leaky_relu(out)
+        out = LeakyReLu(out)
         return out
 
 
@@ -910,7 +911,12 @@ if __name__ == '__main__':
                 # 离线客户端使用上一轮的全局模型参数减去校正项
                 # 对离线客户端使用动量校正
                 offline_w_client = {
-                    k: 0.9 * prev_w_glob_client[k] + 0.1 * (prev_w_glob_client[k] - client_corrections[idx][k])}
+                    k: 0.9 * prev_w_glob_client[k] + 0.1 * (prev_w_glob_client[k] - client_corrections[idx].get(k,
+                                                                                                                torch.zeros_like(
+                                                                                                                    prev_w_glob_client[
+                                                                                                                        k])))
+                    for k in prev_w_glob_client.keys()
+                }
 
                 offline_w_glob_server = {k: prev_w_glob_server[k] - server_corrections[idx][k] for k in
                                          prev_w_glob_server.keys()}
