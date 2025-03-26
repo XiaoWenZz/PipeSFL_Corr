@@ -198,6 +198,8 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     # ---------forward prop-------------
     fx_server = net_glob_server(fx_client)
 
+    print(f"[Debug-train] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
+
     # calculate loss
     loss = criterion(fx_server, y)
     # calculate accuracy
@@ -299,6 +301,8 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
     with torch.no_grad():
         fx_client = fx_client.to('cuda:0')
         y = y.to('cuda:0')
+
+        print(f"[Debug-eval] fx_client[:2]: {fx_client[:2]}, y[:2]: {y[:2]}")
         # ---------forward prop-------------
         fx_server = net_glob_server(fx_client)
 
