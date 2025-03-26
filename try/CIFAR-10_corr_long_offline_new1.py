@@ -300,7 +300,7 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
     net_glob_server.eval()
 
     with torch.no_grad():
-        print("[Debug-eval-pre] fx_client[:2]:", fx_client[:2])
+        # print("[Debug-eval-pre] fx_client[:2]:", fx_client[:2])
         fx_client = fx_client.to('cuda:0')
         y = y.to('cuda:0')
 
@@ -616,7 +616,6 @@ class Client(object):
                 net.load_state_dict(w_client)  # 加载训练后的参数
                 net = net.to('cuda:0')  # 移到 GPU
                 net.eval()
-                print(f"[Debug] Client{self.idx} 测试后参数示例: {list(net.parameters())[0][:2]}")
 
                 with torch.no_grad():
                     len_batch = len(self.ldr_test)
@@ -629,7 +628,7 @@ class Client(object):
 
                         images, labels = images.to('cuda:0'), labels.to('cuda:0')
                         fx = net(images)
-                        # print([f"[Debug] Client{self.idx} fx 部分输出: {fx[:2]}"])
+                        print([f"[Debug-before-evaluate-server] Client{self.idx} fx 部分输出: {fx[:2]}"])
 
                         evaluate_server(fx, labels, self.idx, len_batch, ell)
 
