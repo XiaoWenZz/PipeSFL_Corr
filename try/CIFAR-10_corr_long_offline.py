@@ -616,6 +616,7 @@ class Client(object):
                                                             self.num_users)
 
                         fx.backward(dfx)
+                        torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=5.0)  # 示例阈值，可根据情况调整
                         optimizer_client.step()
 
                 net.to('cpu')
