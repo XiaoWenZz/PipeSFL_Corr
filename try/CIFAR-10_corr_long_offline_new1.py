@@ -208,6 +208,11 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
 
     # --------backward prop--------------
     loss.backward()
+    # 检查梯度是否包含NaN
+    if torch.isnan(fx_client.grad).any():
+        print(f"[Error] Server 梯度包含NaN，Client {idx} 的参数将被标记为无效")
+        idx_round_disconnected.append(idx)
+        return None, net_glob_server  # 返回None表示梯度无效
     dfx_client = fx_client.grad.clone().detach()
     optimizer_server.step()
 
@@ -617,8 +622,18 @@ class Client(object):
                 net = net.to('cuda:0')  # 移到 GPU
                 net.eval()
                 print(f"[Debug-before-evaluate] Client{self.idx} 测试前参数示例: {list(net.parameters())[0][:2]}")
+                # 检查参数是否包含NaN
+                for param in net.parameters():
+                    if torch.isnan(param).any():
+                        print(f"[Error] Client{self.idx} 模型参数包含NaN，跳过测试")
+                        return
 
                 with torch.no_grad():
+                    # 检查测试数据是否包含NaN
+                    for images, labels in self.ldr_test:
+                        if torch.isnan(images).any() or torch.isnan(labels).any():
+                            print(f"[Error] Client{self.idx} 测试数据包含NaN")
+                            return
                     len_batch = len(self.ldr_test)
                     for batch_idx, (images, labels) in enumerate(self.ldr_test):
 
