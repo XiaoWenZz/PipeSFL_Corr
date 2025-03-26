@@ -208,6 +208,8 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
 
     # --------backward prop--------------
     loss.backward()
+    # 梯度裁剪
+    torch.nn.utils.clip_grad_norm_(net_glob_server.parameters(), max_norm=1.0)
     # 检查梯度是否包含NaN
     if torch.isnan(fx_client.grad).any():
         print(f"[Error] Server 梯度包含NaN，Client {idx} 的参数将被标记为无效")
