@@ -234,6 +234,10 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     # ---------forward prop-------------
     fx_server = net_glob_server(fx_client)
 
+    # 新增：检查模型输出是否有 NaN
+    if torch.isnan(fx_server).any():
+        print(f"[Error] Client{idx} 模型输出包含 NaN，当前 fx_server: {fx_server}")
+
     # calculate loss
     loss = criterion(fx_server, y)
     # calculate accuracy
@@ -412,6 +416,11 @@ class DatasetSplit(Dataset):
 
     def __getitem__(self, item):
         image, label = self.dataset[self.idxs[item]]
+
+        # 新增：调试打印标签（确认标签在合法范围）
+        if label < 0 or label >= 10:  # CIFAR-10 标签范围 0-9
+            print(f"[Warning] 异常标签：{label}，索引：{self.idxs[item]}")
+
         return image, label
 
 
