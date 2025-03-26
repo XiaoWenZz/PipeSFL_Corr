@@ -956,8 +956,9 @@ if __name__ == '__main__':
                 for k in global_update_client.keys():
                     correction = global_update_client[k] - w_client[k]
                     if torch.isnan(correction).any() or torch.isinf(correction).any():
-                        correction = torch.zeros_like(correction)  # 重置为0
-                    client_corrections[idx][k] = correction
+                        print(f"[WARN] Client{idx} 校正项 {k} 包含NaN/Inf，重置为0")
+                        correction = torch.zeros_like(correction)
+                    client_corrections[idx][k] = correction.to('cpu')  # 显式移动到CPU
                 # 服务器端训练后，更新服务器端校正项
                 global_update_server = net_glob_server.state_dict()
                 for k in global_update_server.keys():
