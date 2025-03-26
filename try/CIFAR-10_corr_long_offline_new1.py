@@ -616,6 +616,7 @@ class Client(object):
                 net.load_state_dict(w_client)  # 加载训练后的参数
                 net = net.to('cuda:0')  # 移到 GPU
                 net.eval()
+                print(f"[Debug-before-evaluate] Client{self.idx} 测试前参数示例: {list(net.parameters())[0][:2]}")
 
                 with torch.no_grad():
                     len_batch = len(self.ldr_test)
