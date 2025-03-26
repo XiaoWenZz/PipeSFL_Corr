@@ -624,6 +624,7 @@ class Client(object):
 
                         images, labels = images.to('cuda:0'), labels.to('cuda:0')
                         fx = net(images)
+                        print([f"[Debug] Client{self.idx} fx 部分输出: {fx[:2]}"])
 
                         evaluate_server(fx, labels, self.idx, len_batch, ell)
 
