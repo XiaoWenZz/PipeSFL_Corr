@@ -134,39 +134,6 @@ class ResNet50_server_side(nn.Module):
 #                                  Server Side Programs
 # ====================================================================================================
 # Federated averaging: FedAvg
-# def FedAvg(w, corrections, model_type):
-#     """
-#     model_type: 'client' 或 'server'，用于选择对应参数键
-#     """
-#     if not w:
-#         return {}
-#
-#     # 根据模型类型获取基准参数
-#     if model_type == 'client':
-#         w_avg = copy.deepcopy(w[0])
-#         param_keys = net_glob_client.state_dict().keys()
-#     elif model_type == 'server':
-#         w_avg = copy.deepcopy(w[0])
-#         param_keys = net_glob_server.state_dict().keys()
-#     else:
-#         raise ValueError("Invalid model_type")
-#
-#     if len(w) == 1:
-#         # 如果只有一个元素，直接返回该元素的深拷贝
-#         return w_avg
-#
-#     for k in param_keys:
-#         total = w_avg[k].clone()
-#         for i, params in enumerate(w[1:], start=1):
-#             # 防御性编程：确保参数在corrections中存在
-#             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
-#             if i not in idx_disconnected:
-#                 total += params[k].cpu()
-#             else:
-#                 total += params[k].cpu() - corr.cpu()
-#         w_avg[k] = total / len(w)
-#     return w_avg
-
 def FedAvg(w, corrections, model_type):
     """
     model_type: 'client' 或 'server'，用于选择对应参数键
@@ -189,19 +156,52 @@ def FedAvg(w, corrections, model_type):
         return w_avg
 
     for k in param_keys:
-        total = w_avg[k].clone().float()  # 将 total 转换为 Float 类型
+        total = w_avg[k].clone()
         for i, params in enumerate(w[1:], start=1):
-            # 防御性编程：确保参数在 corrections 中存在
+            # 防御性编程：确保参数在corrections中存在
             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
-            # 统一数据类型为 Float
-            params_k = params[k].cpu().float()
-            corr = corr.cpu().float()
             if i not in idx_disconnected:
-                total += params_k
+                total += params[k].cpu()
             else:
-                total += params_k - corr
+                total += params[k].cpu() - corr.cpu()
         w_avg[k] = total / len(w)
     return w_avg
+
+# def FedAvg(w, corrections, model_type):
+#     """
+#     model_type: 'client' 或 'server'，用于选择对应参数键
+#     """
+#     if not w:
+#         return {}
+#
+#     # 根据模型类型获取基准参数
+#     if model_type == 'client':
+#         w_avg = copy.deepcopy(w[0])
+#         param_keys = net_glob_client.state_dict().keys()
+#     elif model_type == 'server':
+#         w_avg = copy.deepcopy(w[0])
+#         param_keys = net_glob_server.state_dict().keys()
+#     else:
+#         raise ValueError("Invalid model_type")
+#
+#     if len(w) == 1:
+#         # 如果只有一个元素，直接返回该元素的深拷贝
+#         return w_avg
+#
+#     for k in param_keys:
+#         total = w_avg[k].clone().float()  # 将 total 转换为 Float 类型
+#         for i, params in enumerate(w[1:], start=1):
+#             # 防御性编程：确保参数在 corrections 中存在
+#             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
+#             # 统一数据类型为 Float
+#             params_k = params[k].cpu().float()
+#             corr = corr.cpu().float()
+#             if i not in idx_disconnected:
+#                 total += params_k
+#             else:
+#                 total += params_k - corr
+#         w_avg[k] = total / len(w)
+#     return w_avg
 
 
 def calculate_accuracy(fx, y):
@@ -726,7 +726,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Training script')
     parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
-    parser.add_argument('--disconnect_prob', type=float, default=0.05, help='Disconnect probability')
+    parser.add_argument('--disconnect_prob', type=float, default=0.25, help='Disconnect probability')
     args = parser.parse_args()
 
     SEED = 1234
