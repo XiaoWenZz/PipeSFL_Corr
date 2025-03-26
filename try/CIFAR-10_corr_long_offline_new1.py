@@ -614,7 +614,7 @@ class Client(object):
                     if torch.isnan(param).any():
                         print(f"[Error] Client{self.idx} 模型参数包含 NaN")
 
-                print(f"[Debug] Client{self.idx} 训练后参数示例: {list(net.parameters())[0][:2]}")
+                # print(f"[Debug] Client{self.idx} 训练后参数示例: {list(net.parameters())[0][:2]}")
                 return net.cpu().state_dict(), self.net_glob_server.cpu().state_dict()
             finally:
                 self.status = "idle"  # 任务结束更新状态
@@ -630,7 +630,7 @@ class Client(object):
                 net.load_state_dict(w_client)  # 加载训练后的参数
                 net = net.to('cuda:0')  # 移到 GPU
                 net.eval()
-                print(f"[Debug-before-evaluate] Client{self.idx} 测试前参数示例: {list(net.parameters())[0][:2]}")
+                # print(f"[Debug-before-evaluate] Client{self.idx} 测试前参数示例: {list(net.parameters())[0][:2]}")
                 # 检查参数是否包含NaN
                 for param in net.parameters():
                     if torch.isnan(param).any():
@@ -653,7 +653,7 @@ class Client(object):
 
                         images, labels = images.to('cuda:0'), labels.to('cuda:0')
                         fx = net(images)
-                        print([f"[Debug-before-evaluate-server] Client{self.idx} fx 部分输出: {fx[:2]}"])
+                        # print([f"[Debug-before-evaluate-server] Client{self.idx} fx 部分输出: {fx[:2]}"])
 
                         evaluate_server(fx, labels, self.idx, len_batch, ell)
 
