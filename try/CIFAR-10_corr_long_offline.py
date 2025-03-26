@@ -189,11 +189,11 @@ def FedAvg(w, corrections, model_type):
         return w_avg
 
     for k in param_keys:
-        total = w_avg[k].clone()
+        total = w_avg[k].clone().float()  # 将 total 转换为 Float 类型
         for i, params in enumerate(w[1:], start=1):
-            # 防御性编程：确保参数在corrections中存在
+            # 防御性编程：确保参数在 corrections 中存在
             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
-            # 统一数据类型为Float
+            # 统一数据类型为 Float
             params_k = params[k].cpu().float()
             corr = corr.cpu().float()
             if i not in idx_disconnected:
