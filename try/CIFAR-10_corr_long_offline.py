@@ -160,10 +160,11 @@ def FedAvg(w, corrections, model_type):
         for i, params in enumerate(w[1:], start=1):
             # 防御性编程：确保参数在corrections中存在
             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
-            if i not in idx_disconnected:
-                total += params[k].cpu()
-            else:
-                total += params[k].cpu() - corr.cpu()
+            # if i not in idx_disconnected:
+            #     total += params[k].cpu()
+            # else:
+            #     total += params[k].cpu() - corr.cpu()
+            total += params[k].cpu()
         w_avg[k] = total / len(w)
     return w_avg
 
