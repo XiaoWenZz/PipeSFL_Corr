@@ -134,10 +134,42 @@ class ResNet50_server_side(nn.Module):
 #                                  Server Side Programs
 # ====================================================================================================
 # Federated averaging: FedAvg
+# def FedAvg(w, corrections, model_type):
+#     """
+#     model_type: 'client' 或 'server'，用于选择对应参数键
+#     """
+#     if not w:
+#         return {}
+#
+#     # 根据模型类型获取基准参数
+#     if model_type == 'client':
+#         w_avg = copy.deepcopy(w[0])
+#         param_keys = net_glob_client.state_dict().keys()
+#     elif model_type == 'server':
+#         w_avg = copy.deepcopy(w[0])
+#         param_keys = net_glob_server.state_dict().keys()
+#     else:
+#         raise ValueError("Invalid model_type")
+#
+#     if len(w) == 1:
+#         # 如果只有一个元素，直接返回该元素的深拷贝
+#         return w_avg
+#
+#     for k in param_keys:
+#         total = w_avg[k].clone()
+#         for i, params in enumerate(w[1:], start=1):
+#             if torch.isnan(params[k]).any():
+#                 print(f"[Error] Client {i} 的参数 {k} 在 FedAvg 中出现 NaN")
+#                 # 防御性编程：确保参数在corrections中存在
+#             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
+#             if i not in idx_disconnected:
+#                 total += params[k].cpu()
+#             else:
+#                 total += params[k].cpu() - corr.cpu()
+#         w_avg[k] = total / len(w)
+#     return w_avg
+
 def FedAvg(w, corrections, model_type):
-    """
-    model_type: 'client' 或 'server'，用于选择对应参数键
-    """
     if not w:
         return {}
 
@@ -152,19 +184,52 @@ def FedAvg(w, corrections, model_type):
         raise ValueError("Invalid model_type")
 
     if len(w) == 1:
-        # 如果只有一个元素，直接返回该元素的深拷贝
         return w_avg
 
     for k in param_keys:
-        total = w_avg[k].clone()
-        for i, params in enumerate(w[1:], start=1):
-            # 防御性编程：确保参数在corrections中存在
-            corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
-            if i not in idx_disconnected:
-                total += params[k].cpu()
-            else:
-                total += params[k].cpu() - corr.cpu()
-        w_avg[k] = total / len(w)
+        total = w_avg[k].clone().float()
+        valid_clients = 0  # 记录有效客户端数量
+
+        # ==== 关键修改：从0开始遍历所有客户端 ====
+        for i, client_params in enumerate(w):
+            if k not in client_params:
+                print(f"[ERROR] Client {i} missing param {k}, skipped")
+                continue
+
+            param = client_params[k].float()
+            # ==== 参数有效性检查 ====
+            if torch.isnan(param).any() or torch.isinf(param).any():
+                print(f"[WARN] Client {i} param {k} invalid, using zeros")
+                param = torch.zeros_like(param)
+
+            # ==== 处理断开客户端的校正项 ====
+            if i in idx_disconnected:
+                corr = corrections.get(i, {}).get(k, torch.zeros_like(param))
+                if torch.isnan(corr).any() or torch.isinf(corr).any():
+                    print(f"[WARN] Client {i} correction {k} invalid, using zeros")
+                    corr = torch.zeros_like(corr)
+                param -= corr
+
+            # ==== 二次检查参数 ====
+            if torch.isnan(param).any() or torch.isinf(param).any():
+                print(f"[WARN] Client {i} adjusted param invalid, skipped")
+                continue  # 跳过无效客户端
+
+            total += param
+            valid_clients += 1
+
+        # ==== 安全归一化 ====
+        if valid_clients > 0:
+            w_avg[k] = total / valid_clients
+        else:
+            print(f"[ERROR] All clients invalid for {k}, using previous global")
+            w_avg[k] = copy.deepcopy(prev_w_glob_client[k] if model_type == 'client' else prev_w_glob_server[k])
+
+        # ==== 最终检查 ====
+        if torch.isnan(w_avg[k]).any() or torch.isinf(w_avg[k]).any():
+            print(f"[ERROR] FedAvg result for {k} still invalid, resetting")
+            w_avg[k] = copy.deepcopy(prev_w_glob_client[k] if model_type == 'client' else prev_w_glob_server[k])
+
     return w_avg
 
 
@@ -198,6 +263,12 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     # ---------forward prop-------------
     fx_server = net_glob_server(fx_client)
 
+    print(f"[Debug-train] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
+
+    # 新增：检查模型输出是否有 NaN
+    if torch.isnan(fx_server).any():
+        print(f"[Error] Client{idx} 模型输出包含 NaN，当前 fx_server: {fx_server}")
+
     # calculate loss
     loss = criterion(fx_server, y)
     # calculate accuracy
@@ -205,6 +276,14 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
 
     # --------backward prop--------------
     loss.backward()
+    # ==== 新增：梯度NaN检查 ====
+    for param in net_glob_server.parameters():
+        if param.grad is not None and (torch.isnan(param.grad).any() or torch.isinf(param.grad).any()):
+            print(f"[WARN] NaN/Inf梯度在参数 {param.shape} 中被检测到，重置梯度")
+            param.grad.data.zero_()
+
+    # ==== 新增：梯度裁剪 ====
+    torch.nn.utils.clip_grad_norm_(net_glob_server.parameters(), max_norm=2.0)
     dfx_client = fx_client.grad.clone().detach()
     optimizer_server.step()
 
@@ -379,6 +458,11 @@ class DatasetSplit(Dataset):
 
     def __getitem__(self, item):
         image, label = self.dataset[self.idxs[item]]
+
+        # 新增：调试打印标签（确认标签在合法范围）
+        if label < 0 or label >= 10:  # CIFAR-10 标签范围 0-9
+            print(f"[Warning] 异常标签：{label}，索引：{self.idxs[item]}")
+
         return image, label
 
 
@@ -583,6 +667,7 @@ class Client(object):
                                                             self.num_users)
 
                         fx.backward(dfx)
+                        torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=5.0)  # 示例阈值，可根据情况调整
                         optimizer_client.step()
 
                 net.to('cpu')
@@ -692,8 +777,8 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
-    parser.add_argument('--disconnect_prob', type=float, default=0.05, help='Disconnect probability')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of epochs')
+    parser.add_argument('--disconnect_prob', type=float, default=0.25, help='Disconnect probability')
     args = parser.parse_args()
 
     SEED = 1234
@@ -865,11 +950,21 @@ if __name__ == '__main__':
             if local.is_disconnected:
                 prRed(f"Client{idx} 断开连接，使用校正变量模拟更新")
                 # 离线客户端使用上一轮的全局模型参数减去校正项
-                offline_w_client = {k: prev_w_glob_client[k] - client_corrections[idx][k] for k in
-                                    prev_w_glob_client.keys()}
+                # offline_w_client = {k: prev_w_glob_client[k] - client_corrections[idx][k] for k in
+                #                     prev_w_glob_client.keys()}
+                # 修改离线参数生成逻辑：
+                offline_w_client = {
+                    k: prev_w_glob_client[k].cpu() - client_corrections[idx][k].cpu()
+                    for k in prev_w_glob_client.keys()
+                }
+                # 增加NaN检查
+                for k in offline_w_client:
+                    if torch.isnan(offline_w_client[k]).any():
+                        offline_w_client[k] = prev_w_glob_client[k].cpu()  # 回退到全局参数
                 offline_w_glob_server = {k: prev_w_glob_server[k] - server_corrections[idx][k] for k in
                                          prev_w_glob_server.keys()}
                 w_locals_client.append(offline_w_client)
+
                 w_glob_server_buffer.append(offline_w_glob_server)
             else:
                 w_locals_client.append(w_client)  # 已在 CPU
@@ -877,9 +972,13 @@ if __name__ == '__main__':
 
                 # 客户端训练后，更新客户端校正项
                 global_update_client = net_glob_client.state_dict()
+                # 客户端校正项更新处修改：
                 for k in global_update_client.keys():
-                    client_corrections[idx][k] = global_update_client[k] - w_client[k]
-
+                    correction = global_update_client[k] - w_client[k]
+                    if torch.isnan(correction).any() or torch.isinf(correction).any():
+                        print(f"[WARN] Client{idx} 校正项 {k} 包含NaN/Inf，重置为0")
+                        correction = torch.zeros_like(correction)
+                    client_corrections[idx][k] = correction.to('cpu')  # 显式移动到CPU
                 # 服务器端训练后，更新服务器端校正项
                 global_update_server = net_glob_server.state_dict()
                 for k in global_update_server.keys():
