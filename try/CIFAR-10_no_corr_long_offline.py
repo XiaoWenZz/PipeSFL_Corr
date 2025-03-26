@@ -597,6 +597,7 @@ class Client(object):
             try:
                 self.status = "testing"  # 更新状态
                 net.eval()
+                print(f"[Debug-before-evaluate] Client{self.idx} 测试前参数示例: {list(net.parameters())[0][:2]}")
 
                 with torch.no_grad():
                     len_batch = len(self.ldr_test)
@@ -609,6 +610,7 @@ class Client(object):
 
                         images, labels = images.to('cuda:0'), labels.to('cuda:0')
                         fx = net(images)
+                        print([f"[Debug-before-evaluate-server] Client{self.idx} fx 部分输出: {fx[:2]}"])
 
                         evaluate_server(fx, labels, self.idx, len_batch, ell)
 
@@ -690,7 +692,7 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
     parser.add_argument('--disconnect_prob', type=float, default=0.25, help='Disconnect probability')
     args = parser.parse_args()
 
