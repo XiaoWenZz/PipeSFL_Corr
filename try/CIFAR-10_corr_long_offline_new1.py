@@ -199,7 +199,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     # ---------forward prop-------------
     fx_server = net_glob_server(fx_client)
 
-    print(f"[Debug-train] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
+    # print(f"[Debug-train] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
 
     # calculate loss
     loss = criterion(fx_server, y)
@@ -300,16 +300,17 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
     net_glob_server.eval()
 
     with torch.no_grad():
+        print("[Debug-eval-pre] fx_client[:2]:", fx_client[:2])
         fx_client = fx_client.to('cuda:0')
         y = y.to('cuda:0')
 
-        print(f"[Debug-eval] fx_client[:2]: {fx_client[:2]}, y[:2]: {y[:2]}")
-        print(f"[Debug-eval] net_glob_server[:2]: {list(net_glob_server.parameters())[0][:2]}")
+        # print(f"[Debug-eval=post] fx_client[:2]: {fx_client[:2]}, y[:2]: {y[:2]}")
+        # print(f"[Debug-eval] net_glob_server[:2]: {list(net_glob_server.parameters())[0][:2]}")
         # ---------forward prop-------------
         fx_server = net_glob_server(fx_client)
 
         # 新增调试：打印模型输出和标签前几个值
-        print(f"[Debug-eval] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
+        # print(f"[Debug-eval] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
 
         # calculate loss
         loss = criterion(fx_server, y)
@@ -615,6 +616,7 @@ class Client(object):
                 net.load_state_dict(w_client)  # 加载训练后的参数
                 net = net.to('cuda:0')  # 移到 GPU
                 net.eval()
+                print(f"[Debug] Client{self.idx} 测试后参数示例: {list(net.parameters())[0][:2]}")
 
                 with torch.no_grad():
                     len_batch = len(self.ldr_test)
@@ -627,7 +629,7 @@ class Client(object):
 
                         images, labels = images.to('cuda:0'), labels.to('cuda:0')
                         fx = net(images)
-                        print([f"[Debug] Client{self.idx} fx 部分输出: {fx[:2]}"])
+                        # print([f"[Debug] Client{self.idx} fx 部分输出: {fx[:2]}"])
 
                         evaluate_server(fx, labels, self.idx, len_batch, ell)
 
@@ -710,8 +712,8 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
-    parser.add_argument('--disconnect_prob', type=float, default=0.05, help='Disconnect probability')
+    parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
+    parser.add_argument('--disconnect_prob', type=float, default=0.25, help='Disconnect probability')
     args = parser.parse_args()
 
     SEED = 1234
@@ -904,7 +906,7 @@ if __name__ == '__main__':
                     server_corrections[idx][k] = global_update_server[k] - w_glob_server[k]
 
                 # Testing -------------------
-                local.evaluate(net=w_client, ell=iter)
+                local.evaluate(w_client, ell=iter)
 
             # 新增：停止当前客户端心跳
             # 在创建客户端后，使用线程执行清理操作
