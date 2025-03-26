@@ -188,25 +188,18 @@ def FedAvg(w, corrections, model_type):
         # 如果只有一个元素，直接返回该元素的深拷贝
         return w_avg
 
-    max_corr_value = 1e3  # 定义最大校正值
     for k in param_keys:
         total = w_avg[k].clone()
         for i, params in enumerate(w[1:], start=1):
             # 防御性编程：确保参数在corrections中存在
             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
-
-            # 检查corrections值是否为nan或inf
-            if torch.isnan(corr).any() or torch.isinf(corr).any():
-                print(f"[Warning] Client {i} 的 {k} 参数的校正值存在 nan 或 inf，将使用零校正值")
-                corr = torch.zeros_like(corr)
-
-            # 限制校正值的大小
-            corr = torch.clamp(corr, -max_corr_value, max_corr_value)
-
+            # 统一数据类型为Float
+            params_k = params[k].cpu().float()
+            corr = corr.cpu().float()
             if i not in idx_disconnected:
-                total += params[k].cpu()
+                total += params_k
             else:
-                total += params[k].cpu() - corr.cpu()
+                total += params_k - corr
         w_avg[k] = total / len(w)
     return w_avg
 
