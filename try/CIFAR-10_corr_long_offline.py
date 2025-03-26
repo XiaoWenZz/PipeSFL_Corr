@@ -303,6 +303,7 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
         y = y.to('cuda:0')
 
         print(f"[Debug-eval] fx_client[:2]: {fx_client[:2]}, y[:2]: {y[:2]}")
+        print(f"[Debug-eval] net_glob_server[:2]: {list(net_glob_server.parameters())[0][:2]}")
         # ---------forward prop-------------
         fx_server = net_glob_server(fx_client)
 
@@ -591,6 +592,13 @@ class Client(object):
 
                 net.to('cpu')
                 net_glob_server.to('cpu')
+
+                # 检查参数是否包含 NaN
+                for param in net.parameters():
+                    if torch.isnan(param).any():
+                        print(f"[Error] Client{self.idx} 模型参数包含 NaN")
+
+                print(f"[Debug] Client{self.idx} 训练后参数示例: {list(net.parameters())[0][:2]}")
                 return net.cpu().state_dict(), self.net_glob_server.cpu().state_dict()
             finally:
                 self.status = "idle"  # 任务结束更新状态
