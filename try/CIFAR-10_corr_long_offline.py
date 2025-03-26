@@ -236,6 +236,8 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     # ---------forward prop-------------
     fx_server = net_glob_server(fx_client)
 
+    print(f"[Debug-train] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
+
     # 新增：检查模型输出是否有 NaN
     if torch.isnan(fx_server).any():
         print(f"[Error] Client{idx} 模型输出包含 NaN，当前 fx_server: {fx_server}")
@@ -343,6 +345,9 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
         y = y.to('cuda:0')
         # ---------forward prop-------------
         fx_server = net_glob_server(fx_client)
+
+        # 新增调试：打印模型输出和标签前几个值
+        print(f"[Debug-eval] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
 
         # calculate loss
         loss = criterion(fx_server, y)
