@@ -158,7 +158,9 @@ def FedAvg(w, corrections, model_type):
     for k in param_keys:
         total = w_avg[k].clone()
         for i, params in enumerate(w[1:], start=1):
-            # 防御性编程：确保参数在corrections中存在
+            if torch.isnan(params[k]).any():
+                print(f"[Error] Client {i} 的参数 {k} 在 FedAvg 中出现 NaN")
+                # 防御性编程：确保参数在corrections中存在
             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
             if i not in idx_disconnected:
                 total += params[k].cpu()
