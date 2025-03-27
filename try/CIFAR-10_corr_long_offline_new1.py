@@ -911,10 +911,9 @@ if __name__ == '__main__':
                 # 离线客户端使用上一轮的全局模型参数减去校正项
                 # 对离线客户端使用动量校正
                 offline_w_client = {
-                    k: 0.9 * prev_w_glob_client[k] + 0.1 * (prev_w_glob_client[k] - client_corrections[idx].get(k,
-                                                                                                                torch.zeros_like(
-                                                                                                                    prev_w_glob_client[
-                                                                                                                        k])))
+                    k: 0.6 * prev_w_glob_client[k].float() + 0.4 * (
+                                prev_w_glob_client[k].float() - client_corrections[idx].get(k, torch.zeros_like(
+                            prev_w_glob_client[k])).float())
                     for k in prev_w_glob_client.keys()
                 }
 
@@ -930,7 +929,7 @@ if __name__ == '__main__':
                 global_update_client = net_glob_client.state_dict()
                 for k in global_update_client.keys():
                     # 对校正项进行数值裁剪
-                    client_corrections[idx][k] = torch.clamp(global_update_client[k] - w_client[k], -1e3, 1e3)
+                    client_corrections[idx][k] = torch.clamp((global_update_client[k] - w_client[k]).float(), -1e3, 1e3)
 
                 # 服务器端训练后，更新服务器端校正项
                 global_update_server = net_glob_server.state_dict()
