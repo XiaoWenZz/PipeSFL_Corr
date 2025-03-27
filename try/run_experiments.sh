@@ -11,10 +11,12 @@ second_python_file="CIFAR-10_no_corr_long_offline.py"
 #    done
 #done
 
-for epochs in 50; do
-    for disconnect_prob in 0.50 0.60 0.70 0.80 0.90 ; do
-        echo "Running with epochs=$epochs and disconnect_prob=$disconnect_prob"
-        $python_path $python_file --epochs $epochs --disconnect_prob $disconnect_prob
+for disconnect_round in 1 2 3 5; do
+    for epochs in 50; do
+        for disconnect_prob in 0.50 0.60 0.70 0.80; do
+            echo "Running with epochs=$epochs, disconnect_prob=$disconnect_prob and disconnect_round=$disconnect_round"
+            $python_path $python_file --epochs $epochs --disconnect_prob $disconnect_prob --disconnect_round $disconnect_round
+        done
     done
 done
 
@@ -25,9 +27,11 @@ done
 #    done
 #done
 
-for epochs in 50; do
-    for disconnect_prob in 0.50 0.60 0.70 0.80 0.90; do
-        echo "Running with epochs=$epochs and disconnect_prob=$disconnect_prob"
-        $python_path $second_python_file --epochs $epochs --disconnect_prob $disconnect_prob
+for disconnect_round in 1 2 3 5; do
+    for epochs in 50; do
+        for disconnect_prob in 0.50 0.60 0.70 0.80; do
+            echo "Running with epochs=$epochs, disconnect_prob=$disconnect_prob and disconnect_round=$disconnect_round"
+            $python_path $second_python_file --epochs $epochs --disconnect_prob $disconnect_prob --disconnect_round $disconnect_round
+        done
     done
 done

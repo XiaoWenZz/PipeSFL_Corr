@@ -409,7 +409,7 @@ class DatasetSplit(Dataset):
 # Client-side functions associated with Training and Testing
 class Client(object):
     def __init__(self, net_client_model, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users, running,
-                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.001, idx_disconnected=None, is_disconnected=False, idx_disconnected_time=None, idx_round_disconnected=None, disconnect_seed=0):
+                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.001, idx_disconnected=None, is_disconnected=False, idx_disconnected_time=None, idx_round_disconnected=None, disconnect_seed=0, disconnect_round = 1):
         self.disconnect_prob = disconnect_prob  # 断开概率
         self.is_disconnected = is_disconnected  # 是否断开
         self.heartbeat_queue = heartbeat_queue
@@ -431,6 +431,7 @@ class Client(object):
         self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size=512, shuffle=True)
         self.disconnect_seed = disconnect_seed
         self.rng = numpy.random.default_rng(seed=self.disconnect_seed + self.idx)
+        self.disconnect_round = disconnect_round
 
         self.idx_disconnected = idx_disconnected
         self.idx_round_disconnected = idx_round_disconnected
@@ -474,7 +475,7 @@ class Client(object):
                                 idx_disconnected.append(self.idx)
                                 idx_round_disconnected.append(self.idx)
 
-                        idx_disconnected_time[self.idx] = 1
+                        idx_disconnected_time[self.idx] = self.disconnect_round
                         time.sleep(self.heartbeat_interval)
                         continue
 
@@ -744,6 +745,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Training script')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
     parser.add_argument('--disconnect_prob', type=float, default=0.25, help='Disconnect probability')
+    parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
     args = parser.parse_args()
 
     SEED = 1234
@@ -770,6 +772,7 @@ if __name__ == '__main__':
     num_users = 3
     epochs = args.epochs
     disconnect_prob = args.disconnect_prob
+    disconnect_round = args.disconnect_round
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
     train_times = []
@@ -899,7 +902,7 @@ if __name__ == '__main__':
                                dataset_train=dataset_train,
                                dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
                                heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob,
-                               idx_disconnected=idx_disconnected, running=running, is_disconnected=True, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed)
+                               idx_disconnected=idx_disconnected, running=running, is_disconnected=True, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed, disconnect_round=disconnect_round)
                 if idx not in idx_round_disconnected:
                     idx_round_disconnected.append(idx)
             else:
@@ -907,7 +910,7 @@ if __name__ == '__main__':
                                dataset_train=dataset_train,
                                dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
                                heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob,
-                               idx_disconnected=idx_disconnected, running=running, is_disconnected=False, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed)
+                               idx_disconnected=idx_disconnected, running=running, is_disconnected=False, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed, disconnect_round=disconnect_round)
 
             # Training ------------------
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
