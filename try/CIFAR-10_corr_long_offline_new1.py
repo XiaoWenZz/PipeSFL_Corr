@@ -944,7 +944,7 @@ if __name__ == '__main__':
                 global_update_client = net_glob_client.state_dict()
                 for k in global_update_client.keys():
                     # 对校正项进行数值裁剪
-                    client_corrections[idx][k] = torch.clamp(global_update_client[k] - w_client[k], -1e3, 1e3)
+                    client_corrections[idx][k] = torch.clamp((global_update_client[k] - w_client[k]).float(), -1e3, 1e3)
 
                 # 服务器端训练后，更新服务器端校正项
                 global_update_server = net_glob_server.state_dict()
