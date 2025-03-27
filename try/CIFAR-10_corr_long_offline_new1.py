@@ -148,6 +148,9 @@ def FedAvg(w, corrections, model_type):
     if not w:
         return {}
 
+        # 统一转换为浮点型
+    w = [{k: v.float() for k, v in params.items()} for params in w]
+
     # 根据模型类型获取基准参数
     if model_type == 'client':
         w_avg = copy.deepcopy(w[0])
@@ -166,7 +169,7 @@ def FedAvg(w, corrections, model_type):
         total = w_avg[k].clone()
         for i, params in enumerate(w[1:], start=1):
             # 防御性编程：确保参数在corrections中存在
-            corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
+            # corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
             # if i not in idx_disconnected:
             #     total += params[k].cpu()
             # else:
@@ -471,7 +474,7 @@ class Client(object):
                                 idx_disconnected.append(self.idx)
                                 idx_round_disconnected.append(self.idx)
 
-                        idx_disconnected_time[self.idx] = 10  # 设置倒计时为 10
+                        idx_disconnected_time[self.idx] = 1
                         time.sleep(self.heartbeat_interval)
                         continue
 
@@ -604,6 +607,9 @@ class Client(object):
                                                             self.num_users)
 
                         fx.backward(dfx)
+                        # 检查梯度类型
+                        for param in net.parameters():
+                            assert param.grad.dtype == torch.float, "Gradient type is not float"
                         optimizer_client.step()
 
                 net.to('cpu')
@@ -736,7 +742,7 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
     parser.add_argument('--disconnect_prob', type=float, default=0.25, help='Disconnect probability')
     args = parser.parse_args()
 
@@ -911,15 +917,23 @@ if __name__ == '__main__':
                 # 离线客户端使用上一轮的全局模型参数减去校正项
                 # 对离线客户端使用动量校正
                 offline_w_client = {
-                    k: 0.9 * prev_w_glob_client[k] + 0.1 * (prev_w_glob_client[k] - client_corrections[idx].get(k,
+                    k: 0.6 * prev_w_glob_client[k] + 0.4 * (prev_w_glob_client[k] - client_corrections[idx].get(k,
                                                                                                                 torch.zeros_like(
                                                                                                                     prev_w_glob_client[
                                                                                                                         k])))
                     for k in prev_w_glob_client.keys()
                 }
+                # 添加类型断言
+                for k in offline_w_client.keys():
+                    assert offline_w_client[k].dtype == torch.float, f"Param {k} type is {offline_w_client[k].dtype}"
 
-                offline_w_glob_server = {k: prev_w_glob_server[k] - server_corrections[idx][k] for k in
-                                         prev_w_glob_server.keys()}
+                offline_w_glob_server = {
+                    k: 0.6 * prev_w_glob_server[k] + 0.4 * (prev_w_glob_server[k] - server_corrections[idx].get(k,
+                                                                                                                torch.zeros_like(
+                                                                                                                    prev_w_glob_server[
+                                                                                                                        k])))
+                    for k in prev_w_glob_server.keys()
+                }
                 w_locals_client.append(offline_w_client)
                 w_glob_server_buffer.append(offline_w_glob_server)
             else:
@@ -935,8 +949,7 @@ if __name__ == '__main__':
                 # 服务器端训练后，更新服务器端校正项
                 global_update_server = net_glob_server.state_dict()
                 for k in global_update_server.keys():
-                    server_corrections[idx][k] = torch.clamp(global_update_server[k] - w_glob_server[k], -1e3, 1e3)
-
+                    server_corrections[idx][k] = torch.clamp((global_update_server[k] - w_glob_server[k]).float(), -1e3,1e3)
                 # Testing -------------------
                 local.evaluate(w_client, ell=iter)
 

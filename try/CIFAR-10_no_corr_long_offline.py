@@ -447,7 +447,7 @@ class Client(object):
                                 idx_disconnected.append(self.idx)
                                 idx_round_disconnected.append(self.idx)
 
-                        idx_disconnected_time[self.idx] = 10  # 设置倒计时为 10
+                        idx_disconnected_time[self.idx] = 1  # 设置倒计时为 10
                         time.sleep(self.heartbeat_interval)
                         continue
 
