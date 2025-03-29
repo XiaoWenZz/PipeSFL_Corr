@@ -409,14 +409,14 @@ class DatasetSplit(Dataset):
 # Client-side functions associated with Training and Testing
 class Client(object):
     def __init__(self, net_client_model, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users, running,
-                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.001, idx_disconnected=None, is_disconnected=False, idx_disconnected_time=None, idx_round_disconnected=None, disconnect_seed=0, disconnect_round = 1):
+                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.001, idx_disconnected=None, is_disconnected=False, idx_disconnected_time=None, idx_round_disconnected=None, disconnect_seed=0, disconnect_round = 1, local_ep = 1):
         self.disconnect_prob = disconnect_prob  # 断开概率
         self.is_disconnected = is_disconnected  # 是否断开
         self.heartbeat_queue = heartbeat_queue
         self.idx = idx
         # self.device = device
         self.lr = lr
-        self.local_ep = 1
+        self.local_ep = local_ep
         self.net_glob_server = net_glob_server
         self.criterion = criterion
         self.batch_acc_train = []
@@ -747,6 +747,7 @@ if __name__ == '__main__':
     parser.add_argument('--disconnect_prob', type=float, default=0.25, help='Disconnect probability')
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
     parser.add_argument("--correction_rate", type=float, default=1.0, help="Correction rate")
+    parser.add_argument("--local_ep", type=int, default=1, help="Local epochs")
     args = parser.parse_args()
 
     SEED = 1234
@@ -775,6 +776,7 @@ if __name__ == '__main__':
     disconnect_prob = args.disconnect_prob
     disconnect_round = args.disconnect_round
     correction_rate = args.correction_rate
+    local_ep = args.local_ep
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = 0.0001
     train_times = []
@@ -904,7 +906,7 @@ if __name__ == '__main__':
                                dataset_train=dataset_train,
                                dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
                                heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob,
-                               idx_disconnected=idx_disconnected, running=running, is_disconnected=True, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed, disconnect_round=disconnect_round)
+                               idx_disconnected=idx_disconnected, running=running, is_disconnected=True, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed, disconnect_round=disconnect_round, local_ep=local_ep)
                 if idx not in idx_round_disconnected:
                     idx_round_disconnected.append(idx)
             else:
@@ -912,7 +914,7 @@ if __name__ == '__main__':
                                dataset_train=dataset_train,
                                dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
                                heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob,
-                               idx_disconnected=idx_disconnected, running=running, is_disconnected=False, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed, disconnect_round=disconnect_round)
+                               idx_disconnected=idx_disconnected, running=running, is_disconnected=False, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed, disconnect_round=disconnect_round, local_ep=local_ep)
 
             # Training ------------------
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
@@ -1042,7 +1044,7 @@ if __name__ == '__main__':
     plt.ylabel('Training Time (s)')
     plt.title('Training Time Curve')
     plt.grid(True)
-    prefix = f"_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_cr{args.correction_rate:.2f}"
+    prefix = f"_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_cr{args.correction_rate:.2f}_le{args.local_ep}"
     # 保存图片 按照当前时间保存 目录为 output/curve
     curve_filename = os.path.join(curve_dir, f'train_time_curve{prefix}_' + time.strftime("%Y%m%d-%H%M%S", time.localtime()) + '.png')
     plt.savefig(curve_filename)
