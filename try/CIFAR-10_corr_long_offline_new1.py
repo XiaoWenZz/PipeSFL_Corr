@@ -236,7 +236,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     # count1: to track the completion of the local batch associated with one client
     count1 += 1
     # print('count1:', count1, '<===>len_batch:', len_batch)
-    if count1 == len_batch:
+    if count1 == len_batch * l_epoch:
         acc_avg_train = sum(batch_acc_train) / len(batch_acc_train)  # it has accuracy for one batch
         loss_avg_train = sum(batch_loss_train) / len(batch_loss_train)
 
@@ -598,7 +598,7 @@ class Client(object):
 
                         self.count1 = self.count1 + 1
 
-                        print('client ', self.idx, ' :', self.count1, '/', len_batch)
+                        print('client ', self.idx, ' :', self.count1, '/', len_batch * self.local_ep)
                         dfx, net_glob_server = train_server(client_fx, labels, iter, self.local_ep, self.idx,
                                                             len_batch, self.net_glob_server,
                                                             self.lr, self.criterion, self.batch_acc_train,
