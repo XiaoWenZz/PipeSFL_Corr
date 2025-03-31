@@ -752,6 +752,8 @@ if __name__ == '__main__':
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
     parser.add_argument("--correction_rate", type=float, default=1.0, help="Correction rate")
     parser.add_argument("--local_ep", type=int, default=10, help="Local epochs")
+    parser.add_argument('--lr_decay', type=float, default=0.95, help='Learning rate decay factor')
+    parser.add_argument("--lr", type=float, default=0.0003, help='Learning rate')
     args = parser.parse_args()
 
     SEED = 1234
@@ -782,7 +784,8 @@ if __name__ == '__main__':
     correction_rate = args.correction_rate
     local_ep = args.local_ep
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
-    lr = 0.0001
+    lr = args.lr
+    lr_decay = args.lr_decay
     train_times = []
 
     net_glob_client = ResNet50_client_side().cpu()
@@ -1027,6 +1030,8 @@ if __name__ == '__main__':
                 loss_test_collect.append(loss_test_collect[-1])
                 print(f"[Debug] acc_test_collect 异常 触发保护机制 重复添加最后一个元素")
         print("==========================================================")
+
+        lr = lr * lr_decay
 
     # ===================================================================================
 

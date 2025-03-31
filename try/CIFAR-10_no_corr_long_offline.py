@@ -708,6 +708,8 @@ if __name__ == '__main__':
     parser.add_argument('--disconnect_prob', type=float, default=0.40, help='Disconnect probability')
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
     parser.add_argument("--local_ep", type=int, default=10, help="Number of local epochs")
+    parser.add_argument('--lr_decay', type=float, default=0.95, help='Learning rate decay factor')
+    parser.add_argument("--lr", type=int, default=0.0003, help='Learning rate')
     args = parser.parse_args()
 
     SEED = 1234
@@ -737,7 +739,8 @@ if __name__ == '__main__':
     disconnect_round = args.disconnect_round
     local_ep = args.local_ep
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
-    lr = 0.0001
+    lr = args.lr
+    lr_decay = args.lr_decay
     train_times = []
 
     net_glob_client = ResNet50_client_side().cpu()
