@@ -71,11 +71,18 @@ class BasicBlock(nn.Module):
             )
 
     def forward(self, x):
-        out = torch.relu(self.bn1(self.conv1(x)))
-        out = torch.relu(self.bn2(self.conv2(out)))
+        # 激活函数使用LeakyReLU
+        # out = torch.relu(self.bn1(self.conv1(x)))
+        # out = torch.relu(self.bn2(self.conv2(out)))
+        # out = self.bn3(self.conv3(out))
+        # out += self.shortcut(x)
+        # out = torch.relu(out)
+        LeakyReLu = nn.LeakyReLU()
+        out = LeakyReLu(self.bn1(self.conv1(x)))
+        out = LeakyReLu(self.bn2(self.conv2(out)))
         out = self.bn3(self.conv3(out))
         out += self.shortcut(x)
-        out = torch.relu(out)
+        out = LeakyReLu(out)
         return out
 
 
@@ -97,7 +104,11 @@ class ResNet50_client_side(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        out = torch.relu(self.bn1(self.conv1(x)))
+        # out = torch.relu(self.bn1(self.conv1(x)))
+        # out = self.layer1(out)
+        # return out
+        LeakyReLu = nn.LeakyReLU()
+        out = LeakyReLu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         return out
 
@@ -694,9 +705,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Training script')
     parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
-    parser.add_argument('--disconnect_prob', type=float, default=0.25, help='Disconnect probability')
+    parser.add_argument('--disconnect_prob', type=float, default=0.40, help='Disconnect probability')
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
-    parser.add_argument("--local_ep", type=int, default=1, help="Number of local epochs")
+    parser.add_argument("--local_ep", type=int, default=10, help="Number of local epochs")
     args = parser.parse_args()
 
     SEED = 1234

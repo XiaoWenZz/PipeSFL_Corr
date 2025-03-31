@@ -99,7 +99,11 @@ class ResNet50_client_side(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        out = torch.relu(self.bn1(self.conv1(x)))
+        # out = torch.relu(self.bn1(self.conv1(x)))
+        # out = self.layer1(out)
+        # return out
+        LeakyReLu = nn.LeakyReLU()
+        out = LeakyReLu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         return out
 
@@ -743,11 +747,11 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
-    parser.add_argument('--disconnect_prob', type=float, default=0.25, help='Disconnect probability')
+    parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
+    parser.add_argument('--disconnect_prob', type=float, default=0.40, help='Disconnect probability')
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
     parser.add_argument("--correction_rate", type=float, default=1.0, help="Correction rate")
-    parser.add_argument("--local_ep", type=int, default=1, help="Local epochs")
+    parser.add_argument("--local_ep", type=int, default=10, help="Local epochs")
     args = parser.parse_args()
 
     SEED = 1234
