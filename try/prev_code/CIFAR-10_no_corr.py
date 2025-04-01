@@ -809,10 +809,10 @@ if __name__ == '__main__':
     print("Training and Evaluation completed!")
 
     # 确保输出目录存在
-    curve_dir = 'output/curve/cifar'
+    curve_dir = '../output/curve/cifar'
     model_dir = 'output/model/cifar'
-    acc_dir = 'output/acc/cifar'
-    loss_dir = 'output/loss/cifar'
+    acc_dir = '../output/acc/cifar'
+    loss_dir = '../output/loss/cifar'
 
     for directory in [curve_dir, model_dir, acc_dir, loss_dir]:
         if not os.path.exists(directory):

@@ -1,20 +1,10 @@
+
 import queue
 import threading
 import argparse
 
 import numpy.random
 from matplotlib import pyplot as plt
-# =============================================================================
-# SplitfedV2 (SFLV2) learning: ResNet18 on CIFAR-10
-# CIFAR-10 dataset: Tschandl, P.: The CIFAR-10 dataset, a large collection of multi - source dermatoscopic images of common pigmented skin lesions (2018), doi:10.7910/DVN/DBW86T
-
-# We have three versions of our implementations
-# Version1: without using socket and no DP+PixelDP
-# Version2: with using socket but no DP+PixelDP
-# Version3: without using socket but with DP+PixelDP
-
-# This program is Version1: Single program simulation
-# ==============================================================================
 import torch
 from torch import nn
 from torchvision import transforms
@@ -170,10 +160,11 @@ def FedAvg(w, corrections, model_type):
         for i, params in enumerate(w[1:], start=1):
             # 防御性编程：确保参数在corrections中存在
             corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
-            if i not in idx_disconnected:
-                total += params[k].cpu()
-            else:
-                total += params[k].cpu() - corr.cpu()
+            # if i not in idx_disconnected:
+            #     total += params[k].cpu()
+            # else:
+            #     total += params[k].cpu() - corr.cpu()
+            total += params[k].cpu()
         w_avg[k] = total / len(w)
     return w_avg
 
@@ -188,7 +179,7 @@ def calculate_accuracy(fx, y):
 # Server-side function associated with Training
 def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_server, lr, criterion,
                  batch_acc_train, batch_loss_train, count1, loss_train_collect_user, acc_train_collect_user,
-                 idx_collect, idx_disconnected,
+                 idx_collect, idx_disconnected, idx_round_disconnected,
                  num_users):
     global l_epoch_check, fed_check
     net_glob_server = net_glob_server.to('cuda:0')  # 将模型移到 GPU 上
@@ -207,6 +198,8 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
 
     # ---------forward prop-------------
     fx_server = net_glob_server(fx_client)
+
+    print(f"[Debug-train] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
 
     # calculate loss
     loss = criterion(fx_server, y)
@@ -255,7 +248,10 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
 
             # collect the id of each new user
             if idx not in idx_collect:
-                idx_collect.append(idx)
+                if idx in idx_disconnected:
+                    print(f"[Warning] Client{idx} 在 idx_disconnected 中，可能存在竞态条件")
+                else:
+                    idx_collect.append(idx)
                 # print(idx_collect)
 
         # for debugging print idxes of idx_collect and idx_disconnected
@@ -263,7 +259,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
         print(f"[Debug] idx_disconnected: {idx_disconnected}")
 
         # This is to check if all users are served for one round --------------------
-        if len(idx_collect) + len(idx_disconnected) == num_users:
+        if len(idx_collect) + len(idx_round_disconnected) == num_users:
             fed_check = True  # to evaluate_server function  - to check fed check has hitted
             # all users served for one round ------------------------- output print and update is done in evaluate_server()
             # for nicer display
@@ -273,15 +269,21 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
                 acc_avg_all_user_train = sum(acc_train_collect_user) / len(acc_train_collect_user)
                 loss_avg_all_user_train = sum(loss_train_collect_user) / len(loss_train_collect_user)
             else:
-                acc_avg_all_user_train = 0
-                loss_avg_all_user_train = 0
+                if len(acc_train_collect) == 0:
+                    acc_avg_all_user_train = 0
+                    loss_avg_all_user_train = 0
+                else:
+                    acc_avg_all_user_train = acc_train_collect[-1]
+                    loss_avg_all_user_train = loss_train_collect[-1]
 
             global acc_avg_all_user_train_global, loss_avg_all_user_train_global
             acc_avg_all_user_train_global = acc_avg_all_user_train
             loss_avg_all_user_train_global = loss_avg_all_user_train
             acc_train_collect.append(acc_avg_all_user_train)
             # for debugging print
-            print('acc_train_collect appended once, current length:', len(acc_train_collect))
+            print('[train_server] acc_train_collect appended once, current length:', len(acc_train_collect))
+            print('[train_server] current idx_collect:', idx_collect)
+            print('[train_server] current idx_disconnected:', idx_disconnected)
             loss_train_collect.append(loss_avg_all_user_train)
 
     # send gradients to the client
@@ -300,8 +302,14 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
     with torch.no_grad():
         fx_client = fx_client.to('cuda:0')
         y = y.to('cuda:0')
+
+        print(f"[Debug-eval] fx_client[:2]: {fx_client[:2]}, y[:2]: {y[:2]}")
+        print(f"[Debug-eval] net_glob_server[:2]: {list(net_glob_server.parameters())[0][:2]}")
         # ---------forward prop-------------
         fx_server = net_glob_server(fx_client)
+
+        # 新增调试：打印模型输出和标签前几个值
+        print(f"[Debug-eval] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
 
         # calculate loss
         loss = criterion(fx_server, y)
@@ -343,6 +351,8 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
 
                 loss_test_collect.append(loss_avg_all_user)
                 acc_test_collect.append(acc_avg_all_user)
+                # for debugging print
+                print('[evaluate_server] acc_test_collect appended once, current length:', len(acc_test_collect))
                 acc_test_collect_user = []
                 loss_test_collect_user = []
 
@@ -381,9 +391,9 @@ class DatasetSplit(Dataset):
 # Client-side functions associated with Training and Testing
 class Client(object):
     def __init__(self, net_client_model, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users, running,
-                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.001, idx_disconnected=None):
+                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.001, idx_disconnected=None, is_disconnected=False, idx_disconnected_time=None, idx_round_disconnected=None, disconnect_seed=0):
         self.disconnect_prob = disconnect_prob  # 断开概率
-        self.is_disconnected = False  # 是否已断开
+        self.is_disconnected = is_disconnected  # 是否断开
         self.heartbeat_queue = heartbeat_queue
         self.idx = idx
         # self.device = device
@@ -401,23 +411,33 @@ class Client(object):
         # self.selected_clients = []
         self.ldr_train = DataLoader(DatasetSplit(dataset_train, idxs), batch_size=512, shuffle=True)
         self.ldr_test = DataLoader(DatasetSplit(dataset_test, idxs_test), batch_size=512, shuffle=True)
+        self.disconnect_seed = disconnect_seed
+        self.rng = numpy.random.default_rng(seed=self.disconnect_seed + self.idx)
 
         self.idx_disconnected = idx_disconnected
+        self.idx_round_disconnected = idx_round_disconnected
+        self.idx_disconnected_time = idx_disconnected_time
         self.running = running
         # 新增心跳管理
         self.status = "idle"  # idle, training, testing
-        self.heartbeat_interval = 5  # 5秒心跳间隔
+        self.heartbeat_interval = 3  # 3秒心跳间隔
+        self.stop_heartbeat_flag = False
         # 心跳线程在初始化最后启动（确保属性已创建）
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
         self.heartbeat_thread.start()
 
     def send_heartbeat(self):
         try:
-            while self.running.value:
+            # while self.running.value and not self.stop_heartbeat_flag:
+            while not self.stop_heartbeat_flag:
                 if not self.is_disconnected:
                     # 仅在未断开时检查是否断开
-                    random_num = numpy.random.random()
-                    self.is_disconnected = random_num < self.disconnect_prob and self.status != "idle"
+                    random_num = self.rng.random()
+                    # 补充 seed
+                    self.rng = numpy.random.default_rng(seed=self.disconnect_seed + self.idx)
+                    # for debugging print random number
+                    print(f"[send_heartbeat] Client{self.idx} 随机数: {random_num}")
+                    self.is_disconnected = random_num < self.disconnect_prob and self.status == "training"
                     if self.is_disconnected:
                         # for debugging print random number
                         print(f"[Random] Client{self.idx} 随机数: {random_num}")
@@ -427,8 +447,16 @@ class Client(object):
 
                         # 在idx_disconnected中记录已断开的客户端
                         if self.idx not in self.idx_disconnected:
-                            idx_disconnected.append(self.idx)
+                            # 添加检查避免竞态条件
+                            if self.idx in self.idx_collect:
+                                print(f"[Warning] Client{self.idx} 在idx_collect中，可能存在竞态条件")
+                                print(f"[send_heartbeat] 触发保护机制，不将 {self.idx} 添加到 idx_disconnected")
+                                continue
+                            else:
+                                idx_disconnected.append(self.idx)
+                                idx_round_disconnected.append(self.idx)
 
+                        idx_disconnected_time[self.idx] = 10  # 设置倒计时为 10
                         time.sleep(self.heartbeat_interval)
                         continue
 
@@ -440,7 +468,6 @@ class Client(object):
                 timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                 self.heartbeat_queue.put((self.idx, self.status, timestamp))
                 time.sleep(self.heartbeat_interval)
-
         except (EOFError, BrokenPipeError):
             print(f"[Info] Client{self.idx} 心跳线程因连接断开而退出")
 
@@ -449,30 +476,44 @@ class Client(object):
 
     def stop_heartbeat(self):
         """停止心跳线程"""
-        self.running.value = False
+        self.stop_heartbeat_flag = True
         if self.heartbeat_thread.is_alive():
             self.heartbeat_thread.join()  # 等待线程结束
 
     def update_fed_check(self):
         """新增鲁棒性保证 如果最后一个client在训练时退出将导致fed_check无法置为True 在这里再做一次检查"""
         global l_epoch_check, fed_check
-        if len(self.idx_collect) + len(self.idx_disconnected) == self.num_users:
+        if len(self.idx_collect) + len(self.idx_round_disconnected) == self.num_users:
             fed_check = True
             # 确保列表中有数据再计算平均
             if len(self.acc_train_collect_user) > 0:
                 acc_avg_all_user_train = sum(self.acc_train_collect_user) / len(self.acc_train_collect_user)
                 loss_avg_all_user_train = sum(self.loss_train_collect_user) / len(self.loss_train_collect_user)
             else:
-                acc_avg_all_user_train = 0
-                loss_avg_all_user_train = 0
+                if len(acc_train_collect) == 0:
+                    acc_avg_all_user_train = 0
+                    loss_avg_all_user_train = 0
+                else:
+                    acc_avg_all_user_train = acc_train_collect[-1]
+                    loss_avg_all_user_train = loss_train_collect[-1]
 
             global acc_avg_all_user_train_global, loss_avg_all_user_train_global
             acc_avg_all_user_train_global = acc_avg_all_user_train
             loss_avg_all_user_train_global = loss_avg_all_user_train
             acc_train_collect.append(acc_avg_all_user_train)
             # for debugging print
-            print('acc_train_collect appended once, current length:', len(acc_train_collect))
+            print('[update_fed_check] acc_train_collect appended once, current length:', len(acc_train_collect))
+            print('[update_fed_check] current idx_collect:', self.idx_collect)
+            print('[update_fed_check] current idx_disconnected:', self.idx_disconnected)
             loss_train_collect.append(loss_avg_all_user_train)
+            if len(acc_test_collect) == 0:
+                acc_test_collect.append(0)
+                loss_test_collect.append(0)
+            else:
+                acc_test_collect.append(acc_test_collect[-1])
+                loss_test_collect.append(loss_test_collect[-1])
+            # for debugging print
+            print('[update_fed_check] acc_test_collect appended once, current length:', len(acc_test_collect))
         return None, None
 
     def train(self, net):
@@ -480,7 +521,10 @@ class Client(object):
         if self.is_disconnected:
             print(f"[Skip] Client{self.idx} 断开，跳过训练")
             if self.idx not in self.idx_disconnected:
-                idx_disconnected.append(self.idx)
+                if self.idx in self.idx_collect:
+                    print(f"[Warning] Client{self.idx} 在 idx_collect 中，可能存在竞态条件")
+                else:
+                    idx_disconnected.append(self.idx)
             if fed_check == False and len(self.idx_collect) + len(self.idx_disconnected) == self.num_users:
                 self.update_fed_check()
             return None, None
@@ -499,7 +543,10 @@ class Client(object):
                     if self.is_disconnected:
                         print(f"[Abort] Client{self.idx} 训练期间断开，终止训练")
                         if self.idx not in self.idx_disconnected:
-                            idx_disconnected.append(self.idx)
+                            if self.idx in self.idx_collect:
+                                print(f"[Warning] Client{self.idx} 在 idx_collect 中，可能存在竞态条件")
+                            else:
+                                idx_disconnected.append(self.idx)
                         if fed_check == False and len(self.idx_collect) + len(self.idx_disconnected) == self.num_users:
                             self.update_fed_check()
                         break
@@ -511,7 +558,10 @@ class Client(object):
                         if self.is_disconnected:
                             print(f"[Abort] Client{self.idx} 训练期间断开，终止训练")
                             if self.idx not in self.idx_disconnected:
-                                idx_disconnected.append(self.idx)
+                                if self.idx in self.idx_collect:
+                                    print(f"[Warning] Client{self.idx} 在 idx_collect 中，可能存在竞态条件")
+                                else:
+                                    idx_disconnected.append(self.idx)
                             if fed_check == False and len(self.idx_collect) + len(
                                     self.idx_disconnected) == self.num_users:
                                 self.update_fed_check()
@@ -535,7 +585,7 @@ class Client(object):
                                                             self.lr, self.criterion, self.batch_acc_train,
                                                             self.batch_loss_train, self.count1,
                                                             self.loss_train_collect_user,
-                                                            self.acc_train_collect_user, self.idx_collect, self.idx_disconnected,
+                                                            self.acc_train_collect_user, self.idx_collect, self.idx_disconnected, self.idx_round_disconnected,
                                                             self.num_users)
 
                         fx.backward(dfx)
@@ -543,6 +593,13 @@ class Client(object):
 
                 net.to('cpu')
                 net_glob_server.to('cpu')
+
+                # 检查参数是否包含 NaN
+                for param in net.parameters():
+                    if torch.isnan(param).any():
+                        print(f"[Error] Client{self.idx} 模型参数包含 NaN")
+
+                print(f"[Debug] Client{self.idx} 训练后参数示例: {list(net.parameters())[0][:2]}")
                 return net.cpu().state_dict(), self.net_glob_server.cpu().state_dict()
             finally:
                 self.status = "idle"  # 任务结束更新状态
@@ -567,6 +624,7 @@ class Client(object):
 
                         images, labels = images.to('cuda:0'), labels.to('cuda:0')
                         fx = net(images)
+                        print([f"[Debug] Client{self.idx} fx 部分输出: {fx[:2]}"])
 
                         evaluate_server(fx, labels, self.idx, len_batch, ell)
 
@@ -637,6 +695,10 @@ def monitor_heartbeats(heartbeat_queue, num_users):
         except Exception as e:
             print(f"[Error] An unexpected error occurred: {e}")
 
+def cleanup_client(local):
+    local.stop_heartbeat()
+    del local
+
 if __name__ == '__main__':
     torch.cuda.init()
     torch.multiprocessing.set_start_method("spawn", force=True)
@@ -644,8 +706,8 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=150, help='Number of epochs')
-    parser.add_argument('--disconnect_prob', type=float, default=0.03, help='Disconnect probability')
+    parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
+    parser.add_argument('--disconnect_prob', type=float, default=0.05, help='Disconnect probability')
     args = parser.parse_args()
 
     SEED = 1234
@@ -682,6 +744,10 @@ if __name__ == '__main__':
     net_glob_server = ResNet50_server_side(10).cpu()
     print(net_glob_server)
 
+    # 初始化上一轮的全局模型参数
+    prev_w_glob_client = {k: v.cpu() for k, v in copy.deepcopy(net_glob_client.state_dict()).items()}
+    prev_w_glob_server = {k: v.cpu() for k, v in copy.deepcopy(net_glob_server.state_dict()).items()}
+
     # ===================================================================================
     # For Server Side Loss and Accuracy
     loss_train_collect = manager.list()
@@ -708,6 +774,11 @@ if __name__ == '__main__':
     # client idx collector
     idx_collect = manager.list()
     idx_disconnected = manager.list()
+    idx_round_disconnected = manager.list()
+
+    # long offline 修改点一 新增数据结构 idx_disconnected_time
+    idx_disconnected_time = manager.list([0] * num_users)  # 初始化倒计时列表
+
     l_epoch_check = False
     fed_check = False
 
@@ -763,27 +834,57 @@ if __name__ == '__main__':
     # this epoch is global epoch, also known as rounds
 
     for iter in range(epochs):
-        # 清空idx_collect和idx_disconnected
+        # 清空idx_collect 和 idx_round_disconnected
         idx_collect[:] = []
-        idx_disconnected[:] = []
+        idx_round_disconnected[:] = []
         start_time = time.time()
         m = max(int(frac * num_users), 1)
         idxs_users = np.random.choice(range(num_users), m, replace=False)
         w_locals_client = []
         w_glob_server_buffer = []
 
+        global_seed = iter  # 可自定义种子值
+        numpy.random.seed(global_seed)
+
+        running.value = True
+
+        # 若idx_disconnected中有客户端且不是全部客户端都断开，则为idx_users排序，确保未断开的客户端在最后 保证eval_server时不会出错
+        # 排序逻辑 在idx_disconnected中的客户端排在最前
+        if len(idx_disconnected) > 0 and len(idx_disconnected) < num_users:
+            print(f"[sort idxs_users] sort idxs_users")
+            idxs_users = sorted(idxs_users, key=lambda x: x not in idx_disconnected)
+            print(f"[Round {iter}] Sorted idxs_users: {idxs_users}")
+
         for idx in idxs_users:
-            local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
-                           dataset_train=dataset_train,
-                           dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
-                           heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob, idx_disconnected=idx_disconnected, running=running)
+            # for debugging print
+            print(f"[Round {iter}] Current user's idx: {idx}")
+            if idx in idx_disconnected:
+                local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
+                               dataset_train=dataset_train,
+                               dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
+                               heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob,
+                               idx_disconnected=idx_disconnected, running=running, is_disconnected=True, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed)
+                if idx not in idx_round_disconnected:
+                    idx_round_disconnected.append(idx)
+            else:
+                local = Client(net_glob_client, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
+                               dataset_train=dataset_train,
+                               dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
+                               heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob,
+                               idx_disconnected=idx_disconnected, running=running, is_disconnected=False, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed)
 
             # Training ------------------
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
 
             if local.is_disconnected:
                 prRed(f"Client{idx} 断开连接，使用校正变量模拟更新")
-                continue
+                # 离线客户端使用上一轮的全局模型参数减去校正项
+                offline_w_client = {k: prev_w_glob_client[k] - client_corrections[idx][k] for k in
+                                    prev_w_glob_client.keys()}
+                offline_w_glob_server = {k: prev_w_glob_server[k] - server_corrections[idx][k] for k in
+                                         prev_w_glob_server.keys()}
+                w_locals_client.append(offline_w_client)
+                w_glob_server_buffer.append(offline_w_glob_server)
             else:
                 w_locals_client.append(w_client)  # 已在 CPU
                 w_glob_server_buffer.append(w_glob_server)  # 已在 CPU
@@ -801,9 +902,16 @@ if __name__ == '__main__':
                 # Testing -------------------
                 local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
 
-                # 新增：停止当前客户端心跳
-                local.stop_heartbeat()
-                del local  # 确保资源释放
+            # 新增：停止当前客户端心跳
+            # 在创建客户端后，使用线程执行清理操作
+            cleanup_thread = threading.Thread(target=cleanup_client, args=(local,), daemon=True)
+            cleanup_thread.start()
+
+        running.value = False
+
+        # 更新上一轮的全局模型参数
+        prev_w_glob_client = {k: v.cpu() for k, v in copy.deepcopy(net_glob_client.state_dict()).items()}
+        prev_w_glob_server = {k: v.cpu() for k, v in copy.deepcopy(net_glob_server.state_dict()).items()}
 
         # Federation process at Client-Side------------------------
         print("------------------------------------------------------------")
@@ -812,6 +920,7 @@ if __name__ == '__main__':
 
         if len(w_locals_client) == 0:
             print("No clients available for Federated Learning!")
+
         else:
             # 客户端联邦平均
             w_glob_client = FedAvg(w_locals_client, client_corrections, model_type='client')
@@ -831,15 +940,41 @@ if __name__ == '__main__':
         print("====================== PipeSFL V1 ========================")
         print('========== Train: Round {:3d} Time: {:2f}s ==============='.format(iter, train_time))
         print("==========================================================")
+
+        # 更新 idx_disconnected_time
+        for i in range(len(idx_disconnected_time)):
+            if idx_disconnected_time[i] > 0:
+                idx_disconnected_time[i] -= 1
+                if idx_disconnected_time[i] == 0:
+                    print(f"[Reconnect] Client{i} 将在下一轮重新连接")
+                    idx_disconnected.remove(i)
+                else:
+                    print(f"[Reconnect] Client{i} 重新连接倒计时: {idx_disconnected_time[i]}")
+
+        # debug
+        fed_check = False
+        print(f"[Debug] len(acc_test_collect): {len(acc_test_collect)}")
+        if len(acc_train_collect) > 0:
+            if len(acc_train_collect) < iter + 1:
+                acc_train_collect.append(acc_train_collect[-1])
+                loss_train_collect.append(loss_train_collect[-1])
+                print(f"[Debug] acc_train_collect 异常 触发保护机制 重复添加最后一个元素")
+        if len(acc_test_collect) > 0:
+            if len(acc_test_collect) < len(acc_train_collect):
+                acc_test_collect.append(acc_test_collect[-1])
+                loss_test_collect.append(loss_test_collect[-1])
+                print(f"[Debug] acc_test_collect 异常 触发保护机制 重复添加最后一个元素")
+        print("==========================================================")
+
     # ===================================================================================
 
     print("Training and Evaluation completed!")
 
     # 确保输出目录存在
-    curve_dir = 'output/curve/cifar'
-    model_dir = 'output/model/cifar'
-    acc_dir = 'output/acc/cifar'
-    loss_dir = 'output/loss/cifar'
+    curve_dir = '../output/curve/cifar/long_offline'
+    model_dir = 'output/model/cifar/long_offline'
+    acc_dir = '../output/acc/cifar/long_offline'
+    loss_dir = '../output/loss/cifar/long_offline'
 
     for directory in [curve_dir, model_dir, acc_dir, loss_dir]:
         if not os.path.exists(directory):
@@ -853,14 +988,14 @@ if __name__ == '__main__':
     plt.grid(True)
     # 保存图片 按照当前时间保存 目录为 output/curve
     curve_filename = os.path.join(curve_dir,
-                                  f'train_time_curve_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
+                                  f'train_time_curve_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S", time.localtime()) + '.png')
     plt.savefig(curve_filename)
     plt.clf()  # 清除当前图形
 
     # 保存模型 命名为 模型名+当前时间
-    client_model_filename = os.path.join(model_dir, f'PipeSFLV1_Corr_ResNet50_CIFAR-10_Client_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+    client_model_filename = os.path.join(model_dir, f'Client_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                                          time.localtime()) + '.pth')
-    server_model_filename = os.path.join(model_dir, f'PipeSFLV1_Corr_ResNet50_CIFAR-10_Server_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+    server_model_filename = os.path.join(model_dir, f'Server_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                                          time.localtime()) + '.pth')
     torch.save(net_glob_client.state_dict(), client_model_filename)
     torch.save(net_glob_server.state_dict(), server_model_filename)
@@ -881,21 +1016,21 @@ if __name__ == '__main__':
     loss_test_df = pd.DataFrame(loss_test_collect_list)
 
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
-    acc_train_filename = os.path.join(acc_dir, f'PipeSFLV1_Corr_ResNet50_CIFAR-10_Client_Acc_ep{args.epochs}_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+    acc_train_filename = os.path.join(acc_dir, f'Client_Acc_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                                         time.localtime()) + '.csv')
     acc_train_df.to_csv(acc_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
     loss_train_filename = os.path.join(loss_dir,
-                                       f'PipeSFLV1_Corr_ResNet50_CIFAR-10_Client_Loss_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+                                       f'Client_Loss_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                                  time.localtime()) + '.csv')
     loss_train_df.to_csv(loss_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
-    acc_test_filename = os.path.join(acc_dir, f'PipeSFLV1_Corr_ResNet50_CIFAR-10_Server_Acc_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+    acc_test_filename = os.path.join(acc_dir, f'Server_Acc_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                                        time.localtime()) + '.csv')
     acc_test_df.to_csv(acc_test_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/loss
     loss_test_filename = os.path.join(loss_dir,
-                                      f'PipeSFLV1_Corr_ResNet50_CIFAR-10_Server_Loss_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S",
+                                      f'Server_Loss_Corr_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                                 time.localtime()) + '.csv')
     loss_test_df.to_csv(loss_test_filename, index=False)
 
@@ -908,7 +1043,7 @@ if __name__ == '__main__':
     plt.legend()
     plt.grid(True)
     acc_curve_filename = os.path.join(curve_dir,
-                                      f'acc_curve_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
+                                      f'acc_curve_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S", time.localtime()) + '.png')
     plt.savefig(acc_curve_filename)
     plt.clf()  # 清除当前图形
 
@@ -921,11 +1056,9 @@ if __name__ == '__main__':
     plt.legend()
     plt.grid(True)
     loss_curve_filename = os.path.join(curve_dir,
-                                       f'loss_curve_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.png')
+                                       f'loss_curve_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_' + time.strftime("%Y%m%d-%H%M%S", time.localtime()) + '.png')
     plt.savefig(loss_curve_filename)
     print('Data saved successfully!')
-
-    running.value = False
 
     # 结束心跳监测进程
     monitor_process.terminate()

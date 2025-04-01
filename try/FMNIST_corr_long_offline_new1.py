@@ -145,7 +145,7 @@ class ResNet50_server_side(nn.Module):
 #                                  Server Side Programs
 # ====================================================================================================
 # Federated averaging: FedAvg
-def FedAvg(w, corrections, model_type, weights):  # 添加 weights 参数
+def FedAvg(w, corrections, model_type):
     if not w:
         return {}
 
@@ -167,7 +167,7 @@ def FedAvg(w, corrections, model_type, weights):  # 添加 weights 参数
         total = torch.zeros_like(w_avg[k])
         for i, params in enumerate(w):
             # 应用权重
-            total += params[k].cpu() * weights[i]
+            total += params[k].cpu()
         w_avg[k] = total
     return w_avg
 
@@ -432,7 +432,7 @@ class Client(object):
         self.running = running
         # 新增心跳管理
         self.status = "idle"  # idle, training, testing
-        self.heartbeat_interval = 3  # 3秒心跳间隔
+        self.heartbeat_interval = 10 # 心跳间隔
         self.stop_heartbeat_flag = False
         # 心跳线程在初始化最后启动（确保属性已创建）
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
@@ -696,15 +696,16 @@ def dataset_iid(dataset, num_users):
 
 def dataset_non_iid(dataset, num_users, class_distribution):
     """
-    该函数用于将数据集按照指定的类别分布划分给不同的客户端，每个客户端持有独特类别的数据。
+    该函数用于将数据集按照指定的类别分布划分给不同的客户端，每个客户端持有独特类别的一半数据，
+    且对于重复持有的类别，不同客户端持有不重复的一半。
     :param dataset: 输入的数据集
     :param num_users: 客户端的数量
-    :param class_distribution: 每个客户端应持有的类别数量列表，其长度需与客户端数量一致，且总和应为数据集中的类别总数
+    :param class_distribution: 每个客户端应持有的类别标记列表，是一个二维列表，每个子列表长度为10，元素为0或1
     :return: 一个字典，键为客户端编号，值为该客户端持有的样本索引集合
     """
     # 检查类别分布的合理性
-    if len(class_distribution) != num_users or sum(class_distribution) != 10:
-        raise ValueError("类别分布列表的长度必须等于客户端数量，且总和必须为 10。")
+    if len(class_distribution) != num_users or any(len(cd) != 10 for cd in class_distribution):
+        raise ValueError("类别分布列表的长度必须等于客户端数量，且每个子列表长度必须为10。")
 
     # 获取数据集中的标签列表
     labels = [label for _, label in dataset]
@@ -713,14 +714,24 @@ def dataset_non_iid(dataset, num_users, class_distribution):
     for idx, label in enumerate(labels):
         class_idxs[label].append(idx)
 
-    dict_users = {}
-    class_assigned = 0
+    dict_users = {i: set() for i in range(num_users)}
+    # 记录每个类别的已分配索引
+    used_indices = {i: [] for i in range(10)}
+
     for user in range(num_users):
-        dict_users[user] = set()
-        num_classes_for_user = class_distribution[user]
-        for i in range(class_assigned, class_assigned + num_classes_for_user):
-            dict_users[user].update(class_idxs[i])
-        class_assigned += num_classes_for_user
+        for cls in range(10):
+            if class_distribution[user][cls] == 1:
+                class_indices = class_idxs[cls]
+                half_len = len(class_indices) // 2
+                available_indices = [idx for idx in class_indices if idx not in used_indices[cls]]
+                if len(available_indices) >= half_len:
+                    assigned_indices = available_indices[:half_len]
+                    dict_users[user].update(assigned_indices)
+                    used_indices[cls].extend(assigned_indices)
+                else:
+                    # 如果可用数据不足一半，将剩余数据全部分配
+                    dict_users[user].update(available_indices)
+                    used_indices[cls].extend(available_indices)
 
     return dict_users
 
@@ -824,7 +835,7 @@ if __name__ == '__main__':
 
     # ===================================================================
     # No. of users
-    num_users = 3
+    num_users = 4
     epochs = args.epochs
     disconnect_prob = args.disconnect_prob
     disconnect_round = args.disconnect_round
@@ -928,14 +939,17 @@ if __name__ == '__main__':
     )
 
     # ----------------------------------------------------------------
-    class_distribution = [3, 3, 4]  # 每个客户端持有的类别数量
+    class_distribution = [
+        [1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+        [1, 1, 1, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 1, 1, 1]
+    ]
     dict_users = dataset_non_iid(dataset_train, num_users, class_distribution)
     dict_users_test = dataset_iid(dataset_test, num_users)
     draw_data_distribution(dict_users, dataset_train, num_users,
                            save_path='output/data_distribution.png')
 
-    total_classes = sum(class_distribution)
-    client_weights = [num_classes / total_classes for num_classes in class_distribution]
 
     # ------------ Training And Testing -----------------
     net_glob_client.train()
@@ -1049,14 +1063,12 @@ if __name__ == '__main__':
             print("No clients available for Federated Learning!")
 
         else:
-            # 选中当轮参与的客户端的权重
-            selected_weights = [client_weights[idx] for idx in idxs_users]
 
             # 客户端联邦平均
-            w_glob_client = FedAvg(w_locals_client, client_corrections, model_type='client', weights=selected_weights)
+            w_glob_client = FedAvg(w_locals_client, client_corrections, model_type='client')
 
             # 服务器端联邦平均
-            w_glob_server = FedAvg(w_glob_server_buffer, server_corrections, model_type='server', weights=selected_weights)
+            w_glob_server = FedAvg(w_glob_server_buffer, server_corrections, model_type='server')
 
             # Update client-side global model
             net_glob_client.load_state_dict(w_glob_client)
