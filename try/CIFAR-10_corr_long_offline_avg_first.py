@@ -1,31 +1,26 @@
+
 import queue
 import threading
 import argparse
 
 import numpy.random
 from matplotlib import pyplot as plt
-# =============================================================================
-# SplitfedV2 (SFLV2) learning: ResNet18 on CIFAR-10
-# CIFAR-10 dataset: Tschandl, P.: The CIFAR-10 dataset, a large collection of multi - source dermatoscopic images of common pigmented skin lesions (2018), doi:10.7910/DVN/DBW86T
-
-# We have three versions of our implementations
-# Version1: without using socket and no DP+PixelDP
-# Version2: with using socket but no DP+PixelDP
-# Version3: without using socket but with DP+PixelDP
-
-# This program is Version1: Single program simulation
-# ==============================================================================
 import torch
 from torch import nn
-from torchvision import transforms, datasets
+from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset
+import torch.nn.functional as F
+import math
+import os.path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from PIL import Image
 from glob import glob
+from pandas import DataFrame
 import random
 import numpy as np
 import os
+from torchvision import datasets, models
 import time
 import multiprocessing
 
@@ -150,12 +145,15 @@ class ResNet50_server_side(nn.Module):
 #                                  Server Side Programs
 # ====================================================================================================
 # Federated averaging: FedAvg
-def FedAvg(w, model_type):
+def FedAvg(w, corrections, model_type):
     """
     model_type: 'client' 或 'server'，用于选择对应参数键
     """
     if not w:
         return {}
+
+        # 统一转换为浮点型
+    w = [{k: v.float() for k, v in params.items()} for params in w]
 
     # 根据模型类型获取基准参数
     if model_type == 'client':
@@ -174,6 +172,12 @@ def FedAvg(w, model_type):
     for k in param_keys:
         total = w_avg[k].clone()
         for i, params in enumerate(w[1:], start=1):
+            # 防御性编程：确保参数在corrections中存在
+            # corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
+            # if i not in idx_disconnected:
+            #     total += params[k].cpu()
+            # else:
+            #     total += params[k].cpu() - corr.cpu()
             total += params[k].cpu()
         w_avg[k] = total / len(w)
     return w_avg
@@ -209,6 +213,8 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     # ---------forward prop-------------
     fx_server = net_glob_server(fx_client)
 
+    # print(f"[Debug-train] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
+
     # calculate loss
     loss = criterion(fx_server, y)
     # calculate accuracy
@@ -216,6 +222,13 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
 
     # --------backward prop--------------
     loss.backward()
+    # 梯度裁剪
+    torch.nn.utils.clip_grad_norm_(net_glob_server.parameters(), max_norm=1.0)
+    # 检查梯度是否包含NaN
+    if torch.isnan(fx_client.grad).any():
+        print(f"[Error] Server 梯度包含NaN，Client {idx} 的参数将被标记为无效")
+        idx_round_disconnected.append(idx)
+        return None, net_glob_server  # 返回None表示梯度无效
     dfx_client = fx_client.grad.clone().detach()
     optimizer_server.step()
 
@@ -308,10 +321,17 @@ def evaluate_server(fx_client, y, idx, len_batch, ell):
     net_glob_server.eval()
 
     with torch.no_grad():
+        # print("[Debug-eval-pre] fx_client[:2]:", fx_client[:2])
         fx_client = fx_client.to('cuda:0')
         y = y.to('cuda:0')
+
+        # print(f"[Debug-eval=post] fx_client[:2]: {fx_client[:2]}, y[:2]: {y[:2]}")
+        # print(f"[Debug-eval] net_glob_server[:2]: {list(net_glob_server.parameters())[0][:2]}")
         # ---------forward prop-------------
         fx_server = net_glob_server(fx_client)
+
+        # 新增调试：打印模型输出和标签前几个值
+        # print(f"[Debug-eval] fx_server[:2]: {fx_server[:2]}, y[:2]: {y[:2]}")
 
         # calculate loss
         loss = criterion(fx_server, y)
@@ -393,7 +413,7 @@ class DatasetSplit(Dataset):
 # Client-side functions associated with Training and Testing
 class Client(object):
     def __init__(self, net_client_model, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users, running,
-                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.001, idx_disconnected=None, is_disconnected=False, idx_disconnected_time=None, idx_round_disconnected=None, disconnect_seed=0, disconnect_round=1, local_ep=1):
+                 dataset_train=None, dataset_test=None, idxs=None, idxs_test=None, heartbeat_queue=None, disconnect_prob=0.001, idx_disconnected=None, is_disconnected=False, idx_disconnected_time=None, idx_round_disconnected=None, disconnect_seed=0, disconnect_round = 1, local_ep = 1):
         self.disconnect_prob = disconnect_prob  # 断开概率
         self.is_disconnected = is_disconnected  # 是否断开
         self.heartbeat_queue = heartbeat_queue
@@ -423,7 +443,7 @@ class Client(object):
         self.running = running
         # 新增心跳管理
         self.status = "idle"  # idle, training, testing
-        self.heartbeat_interval =3  # 3秒心跳间隔
+        self.heartbeat_interval = 3  # 3秒心跳间隔
         self.stop_heartbeat_flag = False
         # 心跳线程在初始化最后启动（确保属性已创建）
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
@@ -433,7 +453,7 @@ class Client(object):
         try:
             # while self.running.value and not self.stop_heartbeat_flag:
             while not self.stop_heartbeat_flag:
-                if not self.is_disconnected and not self.stop_heartbeat_flag:
+                if not self.is_disconnected:
                     # 仅在未断开时检查是否断开
                     random_num = self.rng.random()
                     # 补充 seed
@@ -471,7 +491,6 @@ class Client(object):
                 timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                 self.heartbeat_queue.put((self.idx, self.status, timestamp))
                 time.sleep(self.heartbeat_interval)
-
         except (EOFError, BrokenPipeError):
             print(f"[Info] Client{self.idx} 心跳线程因连接断开而退出")
 
@@ -593,25 +612,48 @@ class Client(object):
                                                             self.num_users)
 
                         fx.backward(dfx)
+                        # 检查梯度类型
+                        for param in net.parameters():
+                            assert param.grad.dtype == torch.float, "Gradient type is not float"
                         optimizer_client.step()
 
                 net.to('cpu')
                 net_glob_server.to('cpu')
+
+                # 检查参数是否包含 NaN
+                for param in net.parameters():
+                    if torch.isnan(param).any():
+                        print(f"[Error] Client{self.idx} 模型参数包含 NaN")
+
+                # print(f"[Debug] Client{self.idx} 训练后参数示例: {list(net.parameters())[0][:2]}")
                 return net.cpu().state_dict(), self.net_glob_server.cpu().state_dict()
             finally:
                 self.status = "idle"  # 任务结束更新状态
 
-    def evaluate(self, net, ell):
+    def evaluate(self, w_client, ell):
         if self.is_disconnected:
             print(f"[Skip] Client{self.idx} 断开，跳过测试")
             return
         else:
             try:
                 self.status = "testing"  # 更新状态
+                net = ResNet50_client_side().cpu()  # 初始化新模型
+                net.load_state_dict(w_client)  # 加载训练后的参数
+                net = net.to('cuda:0')  # 移到 GPU
                 net.eval()
                 # print(f"[Debug-before-evaluate] Client{self.idx} 测试前参数示例: {list(net.parameters())[0][:2]}")
+                # 检查参数是否包含NaN
+                for param in net.parameters():
+                    if torch.isnan(param).any():
+                        print(f"[Error] Client{self.idx} 模型参数包含NaN，跳过测试")
+                        return
 
                 with torch.no_grad():
+                    # 检查测试数据是否包含NaN
+                    for images, labels in self.ldr_test:
+                        if torch.isnan(images).any() or torch.isnan(labels).any():
+                            print(f"[Error] Client{self.idx} 测试数据包含NaN")
+                            return
                     len_batch = len(self.ldr_test)
                     for batch_idx, (images, labels) in enumerate(self.ldr_test):
 
@@ -628,6 +670,7 @@ class Client(object):
 
             finally:
                 self.status = "idle"  # 任务结束更新状态
+                net.to('cpu')
 
 
 # =====================================================================================================
@@ -697,6 +740,7 @@ def cleanup_client(local):
     local.stop_heartbeat()
     del local
 
+
 if __name__ == '__main__':
     torch.cuda.init()
     torch.multiprocessing.set_start_method("spawn", force=True)
@@ -707,9 +751,10 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=5, help='Number of epochs')
     parser.add_argument('--disconnect_prob', type=float, default=0.40, help='Disconnect probability')
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
-    parser.add_argument("--local_ep", type=int, default=10, help="Number of local epochs")
+    parser.add_argument("--correction_rate", type=float, default=1.0, help="Correction rate")
+    parser.add_argument("--local_ep", type=int, default=10, help="Local epochs")
     parser.add_argument('--lr_decay', type=float, default=0.85, help='Learning rate decay factor')
-    parser.add_argument("--lr", type=int, default=0.0003, help='Learning rate')
+    parser.add_argument("--lr", type=float, default=0.0003, help='Learning rate')
     args = parser.parse_args()
 
     SEED = 1234
@@ -737,6 +782,7 @@ if __name__ == '__main__':
     epochs = args.epochs
     disconnect_prob = args.disconnect_prob
     disconnect_round = args.disconnect_round
+    correction_rate = args.correction_rate
     local_ep = args.local_ep
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
     lr = args.lr
@@ -748,6 +794,10 @@ if __name__ == '__main__':
 
     net_glob_server = ResNet50_server_side(10).cpu()
     print(net_glob_server)
+
+    # 初始化上一轮的全局模型参数
+    prev_w_glob_client = {k: v.cpu() for k, v in copy.deepcopy(net_glob_client.state_dict()).items()}
+    prev_w_glob_server = {k: v.cpu() for k, v in copy.deepcopy(net_glob_server.state_dict()).items()}
 
     # ===================================================================================
     # For Server Side Loss and Accuracy
@@ -775,11 +825,11 @@ if __name__ == '__main__':
     # client idx collector
     idx_collect = manager.list()
     idx_disconnected = manager.list()
-    # 当轮内断开的客户端列表 每轮清空 防止fed_check异常导致两次append
     idx_round_disconnected = manager.list()
 
     # long offline 修改点一 新增数据结构 idx_disconnected_time
     idx_disconnected_time = manager.list([0] * num_users)  # 初始化倒计时列表
+
     l_epoch_check = False
     fed_check = False
 
@@ -790,9 +840,17 @@ if __name__ == '__main__':
     monitor_process = multiprocessing.Process(target=monitor_heartbeats, args=(heartbeat_queue, num_users))
     monitor_process.start()
 
+    # 初始化校正变量
+    client_corrections = {i: {k: torch.zeros_like(v) for k, v in net_glob_client.state_dict().items()} for i in
+                          range(num_users)}
+    server_corrections = {i: {k: torch.zeros_like(v) for k, v in net_glob_server.state_dict().items()} for i in
+                          range(num_users)}
+
     # =============================================================================
     #                         Data preprocessing
     # =============================================================================
+
+    # 数据预处理
     mean = [0.4914, 0.4822, 0.4465]
     std = [0.2470, 0.2435, 0.2616]
 
@@ -827,7 +885,7 @@ if __name__ == '__main__':
     # this epoch is global epoch, also known as rounds
 
     for iter in range(epochs):
-        # 清空idx_collect和idx_round_disconnected
+        # 清空idx_collect 和 idx_round_disconnected
         idx_collect[:] = []
         idx_round_disconnected[:] = []
         start_time = time.time()
@@ -835,6 +893,7 @@ if __name__ == '__main__':
         idxs_users = np.random.choice(range(num_users), m, replace=False)
         w_locals_client = []
         w_glob_server_buffer = []
+
         global_seed = iter  # 可自定义种子值
         numpy.random.seed(global_seed)
 
@@ -855,7 +914,10 @@ if __name__ == '__main__':
                                dataset_train=dataset_train,
                                dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
                                heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob,
-                               idx_disconnected=idx_disconnected, running=running, is_disconnected=True, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed, disconnect_round=disconnect_round, local_ep=local_ep)
+                               idx_disconnected=idx_disconnected, running=running, is_disconnected=True,
+                               idx_disconnected_time=idx_disconnected_time,
+                               idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed,
+                               disconnect_round=disconnect_round, local_ep=local_ep)
                 if idx not in idx_round_disconnected:
                     idx_round_disconnected.append(idx)
             else:
@@ -863,20 +925,55 @@ if __name__ == '__main__':
                                dataset_train=dataset_train,
                                dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
                                heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob,
-                               idx_disconnected=idx_disconnected, running=running, is_disconnected=False, idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed, disconnect_round=disconnect_round, local_ep=local_ep)
+                               idx_disconnected=idx_disconnected, running=running, is_disconnected=False,
+                               idx_disconnected_time=idx_disconnected_time,
+                               idx_round_disconnected=idx_round_disconnected, disconnect_seed=global_seed,
+                               disconnect_round=disconnect_round, local_ep=local_ep)
 
             # Training ------------------
             w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
 
             if local.is_disconnected:
-                prRed(f"Client{idx} 断开连接，不使用校正变量模拟更新，直接跳过")
-                continue
+                prRed(f"Client{idx} 断开连接，使用校正变量模拟更新")
+                # 离线客户端使用上一轮的全局模型参数减去校正项
+                # 对离线客户端使用动量校正
+                offline_w_client = {
+                    k: (1 - correction_rate) * prev_w_glob_client[k] + correction_rate * (
+                                prev_w_glob_client[k] - client_corrections[idx].get(k,
+                                                                                    torch.zeros_like(
+                                                                                        prev_w_glob_client[
+                                                                                            k])))
+                    for k in prev_w_glob_client.keys()
+                }
+                # 添加类型断言
+                for k in offline_w_client.keys():
+                    assert offline_w_client[k].dtype == torch.float, f"Param {k} type is {offline_w_client[k].dtype}"
+
+                offline_w_glob_server = {
+                    k: (1 - correction_rate) * prev_w_glob_server[k] + correction_rate * (
+                                prev_w_glob_server[k] - server_corrections[idx].get(k,
+                                                                                    torch.zeros_like(
+                                                                                        prev_w_glob_server[
+                                                                                            k])))
+                    for k in prev_w_glob_server.keys()
+                }
+                w_locals_client.append(offline_w_client)
+                w_glob_server_buffer.append(offline_w_glob_server)
             else:
                 w_locals_client.append(w_client)  # 已在 CPU
                 w_glob_server_buffer.append(w_glob_server)  # 已在 CPU
 
-                # Testing -------------------
-                local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
+                # 客户端训练后，更新客户端校正项
+                global_update_client = net_glob_client.state_dict()
+                for k in global_update_client.keys():
+                    # 对校正项进行数值裁剪
+                    client_corrections[idx][k] = torch.clamp((global_update_client[k] - w_client[k]).float(), -1e3, 1e3)
+
+                # 服务器端训练后，更新服务器端校正项
+                global_update_server = net_glob_server.state_dict()
+                for k in global_update_server.keys():
+                    server_corrections[idx][k] = torch.clamp((global_update_server[k] - w_glob_server[k]).float(), -1e3,
+                                                             1e3)
 
             # 新增：停止当前客户端心跳
             # 在创建客户端后，使用线程执行清理操作
@@ -884,6 +981,10 @@ if __name__ == '__main__':
             cleanup_thread.start()
 
         running.value = False
+
+        # 更新上一轮的全局模型参数
+        prev_w_glob_client = {k: v.cpu() for k, v in copy.deepcopy(net_glob_client.state_dict()).items()}
+        prev_w_glob_server = {k: v.cpu() for k, v in copy.deepcopy(net_glob_server.state_dict()).items()}
 
         # Federation process at Client-Side------------------------
         print("------------------------------------------------------------")
@@ -895,16 +996,47 @@ if __name__ == '__main__':
 
         else:
             # 客户端联邦平均
-            w_glob_client = FedAvg(w_locals_client, model_type='client')
+            w_glob_client = FedAvg(w_locals_client, client_corrections, model_type='client')
 
             # 服务器端联邦平均
-            w_glob_server = FedAvg(w_glob_server_buffer, model_type='server')
+            w_glob_server = FedAvg(w_glob_server_buffer, server_corrections, model_type='server')
 
             # Update client-side global model
             net_glob_client.load_state_dict(w_glob_client)
 
             # Update server-side global model
             net_glob_server.load_state_dict(w_glob_server)
+
+        # 新增全局测试阶段
+        print("------------------------------------------------------------")
+        print("------ Fed Server: Global Model Evaluation -------")
+        print("------------------------------------------------------------")
+
+        # 重置测试状态
+        l_epoch_check = False
+        fed_check = False
+
+        # 遍历所有客户端进行测试
+        for idx in range(num_users):
+            # 加载全局模型参数
+            net_client_global = ResNet50_client_side().cpu()
+            net_client_global.load_state_dict(net_glob_client.state_dict())
+
+            # 创建客户端实例（使用全局模型）
+            local = Client(net_client_global, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
+                           dataset_train=dataset_train,
+                           dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
+                           heartbeat_queue=heartbeat_queue, disconnect_prob=disconnect_prob,
+                           idx_disconnected=idx_disconnected, running=running, is_disconnected=False,
+                           idx_disconnected_time=idx_disconnected_time, idx_round_disconnected=idx_round_disconnected,
+                           disconnect_seed=global_seed, disconnect_round=disconnect_round, local_ep=local_ep)
+
+            # 使用全局模型进行测试
+            local.evaluate(net_client_global.state_dict(), ell=iter)
+
+            # 清理客户端资源
+            cleanup_thread = threading.Thread(target=cleanup_client, args=(local,), daemon=True)
+            cleanup_thread.start()
 
         train_time = time.time() - start_time  # 新增：计算当前轮次的训练时间
         train_times.append(train_time)  # 新增：将当前轮次的训练时间添加到列表中
@@ -960,7 +1092,7 @@ if __name__ == '__main__':
     plt.ylabel('Training Time (s)')
     plt.title('Training Time Curve')
     plt.grid(True)
-    prefix = f"_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_le{args.local_ep}"
+    prefix = f"_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_cr{args.correction_rate:.2f}_le{args.local_ep}"
     # 保存图片 按照当前时间保存 目录为 output/curve
     curve_filename = os.path.join(curve_dir, f'train_time_curve{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                           time.localtime()) + '.png')
@@ -989,22 +1121,22 @@ if __name__ == '__main__':
     acc_test_df = pd.DataFrame(acc_test_collect_list)
     loss_test_df = pd.DataFrame(loss_test_collect_list)
 
-    acc_train_filename = os.path.join(acc_dir, f'Client_Acc_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+    acc_train_filename = os.path.join(acc_dir, f'Client_Acc_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                            time.localtime()) + '.csv')
     acc_train_df.to_csv(acc_train_filename, index=False)
 
-    loss_train_filename = os.path.join(loss_dir, f'Client_Loss_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+    loss_train_filename = os.path.join(loss_dir, f'Client_Loss_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                               time.localtime()) + '.csv')
     loss_train_df.to_csv(loss_train_filename, index=False)
     # 命名为 模型名+ 数据名+当前时间 目录为 output/acc
     # acc_test_filename = os.path.join(acc_dir, f'Server_Acc_Corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_' + time.strftime("%Y%m%d-%H%M%S",
     #                                                                                                    time.localtime()) + '.csv')
     # 使用prefix
-    acc_test_filename = os.path.join(acc_dir, f'Server_Acc_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+    acc_test_filename = os.path.join(acc_dir, f'Server_Acc_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                           time.localtime()) + '.csv')
     acc_test_df.to_csv(acc_test_filename, index=False)
 
-    loss_test_filename = os.path.join(loss_dir, f'Server_Loss_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+    loss_test_filename = os.path.join(loss_dir, f'Server_Loss_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                              time.localtime()) + '.csv')
     loss_test_df.to_csv(loss_test_filename, index=False)
 
@@ -1018,7 +1150,7 @@ if __name__ == '__main__':
     plt.grid(True)
 
     acc_curve_filename = os.path.join(curve_dir,
-                                      f'acc_curve_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+                                      f'acc_curve_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                  time.localtime()) + '.png')
     plt.savefig(acc_curve_filename)
     plt.clf()  # 清除当前图形
@@ -1033,7 +1165,7 @@ if __name__ == '__main__':
     plt.grid(True)
 
     loss_curve_filename = os.path.join(curve_dir,
-                                       f'loss_curve_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+                                       f'loss_curve_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                    time.localtime()) + '.png')
     plt.savefig(loss_curve_filename)
     print('Data saved successfully!')

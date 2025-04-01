@@ -875,9 +875,6 @@ if __name__ == '__main__':
                 w_locals_client.append(w_client)  # 已在 CPU
                 w_glob_server_buffer.append(w_glob_server)  # 已在 CPU
 
-                # Testing -------------------
-                local.evaluate(net=copy.deepcopy(net_glob_client).to('cuda:0'), ell=iter)
-
             # 新增：停止当前客户端心跳
             # 在创建客户端后，使用线程执行清理操作
             cleanup_thread = threading.Thread(target=cleanup_client, args=(local,), daemon=True)
@@ -905,6 +902,40 @@ if __name__ == '__main__':
 
             # Update server-side global model
             net_glob_server.load_state_dict(w_glob_server)
+
+        # 新增全局测试阶段
+        print("------------------------------------------------------------")
+        print("------ Fed Server: Global Model Evaluation -------")
+        print("------------------------------------------------------------")
+
+        # 重置测试状态
+        l_epoch_check = False
+        fed_check = False
+
+        # 遍历所有客户端进行测试
+        for idx in range(num_users):
+            # 加载全局模型参数
+            net_client_global = ResNet50_client_side().cpu()
+            net_client_global.load_state_dict(net_glob_client.state_dict())
+
+             # 创建客户端实例（使用全局模型）
+            local = Client(net_client_global, idx, lr, net_glob_server, criterion, count1, idx_collect, num_users,
+                               dataset_train=dataset_train,
+                               dataset_test=dataset_test, idxs=dict_users[idx], idxs_test=dict_users_test[idx],
+                               heartbeat_queue=heartbeat_queue, disconnect_prob=0,
+                               idx_disconnected=idx_disconnected, running=running, is_disconnected=False,
+                               idx_disconnected_time=idx_disconnected_time,
+                               idx_round_disconnected=idx_round_disconnected,
+                               disconnect_seed=global_seed, disconnect_round=disconnect_round, local_ep=local_ep)
+
+             # 使用全局模型进行测试
+            local.evaluate(net_client_global.state_dict(), ell=iter)
+
+             # 清理客户端资源
+            cleanup_thread = threading.Thread(target=cleanup_client, args=(local,), daemon=True)
+            cleanup_thread.start()
+
+
 
         train_time = time.time() - start_time  # 新增：计算当前轮次的训练时间
         train_times.append(train_time)  # 新增：将当前轮次的训练时间添加到列表中
