@@ -145,17 +145,12 @@ class ResNet50_server_side(nn.Module):
 #                                  Server Side Programs
 # ====================================================================================================
 # Federated averaging: FedAvg
-def FedAvg(w, corrections, model_type):
-    """
-    model_type: 'client' 或 'server'，用于选择对应参数键
-    """
+def FedAvg(w, corrections, model_type, weights):  # 添加 weights 参数
     if not w:
         return {}
 
-        # 统一转换为浮点型
     w = [{k: v.float() for k, v in params.items()} for params in w]
 
-    # 根据模型类型获取基准参数
     if model_type == 'client':
         w_avg = copy.deepcopy(w[0])
         param_keys = net_glob_client.state_dict().keys()
@@ -166,20 +161,14 @@ def FedAvg(w, corrections, model_type):
         raise ValueError("Invalid model_type")
 
     if len(w) == 1:
-        # 如果只有一个元素，直接返回该元素的深拷贝
         return w_avg
 
     for k in param_keys:
-        total = w_avg[k].clone()
-        for i, params in enumerate(w[1:], start=1):
-            # 防御性编程：确保参数在corrections中存在
-            # corr = corrections.get(i, {k: torch.zeros_like(params.get(k, 0))}).get(k, torch.zeros_like(params[k]))
-            # if i not in idx_disconnected:
-            #     total += params[k].cpu()
-            # else:
-            #     total += params[k].cpu() - corr.cpu()
-            total += params[k].cpu()
-        w_avg[k] = total / len(w)
+        total = torch.zeros_like(w_avg[k])
+        for i, params in enumerate(w):
+            # 应用权重
+            total += params[k].cpu() * weights[i]
+        w_avg[k] = total
     return w_avg
 
 
@@ -705,6 +694,36 @@ def dataset_iid(dataset, num_users):
     return dict_users
 
 
+def dataset_non_iid(dataset, num_users, class_distribution):
+    """
+    该函数用于将数据集按照指定的类别分布划分给不同的客户端，每个客户端持有独特类别的数据。
+    :param dataset: 输入的数据集
+    :param num_users: 客户端的数量
+    :param class_distribution: 每个客户端应持有的类别数量列表，其长度需与客户端数量一致，且总和应为数据集中的类别总数
+    :return: 一个字典，键为客户端编号，值为该客户端持有的样本索引集合
+    """
+    # 检查类别分布的合理性
+    if len(class_distribution) != num_users or sum(class_distribution) != 10:
+        raise ValueError("类别分布列表的长度必须等于客户端数量，且总和必须为 10。")
+
+    # 获取数据集中的标签列表
+    labels = [label for _, label in dataset]
+    # 统计每个类别的样本索引
+    class_idxs = {i: [] for i in range(10)}
+    for idx, label in enumerate(labels):
+        class_idxs[label].append(idx)
+
+    dict_users = {}
+    class_assigned = 0
+    for user in range(num_users):
+        dict_users[user] = set()
+        num_classes_for_user = class_distribution[user]
+        for i in range(class_assigned, class_assigned + num_classes_for_user):
+            dict_users[user].update(class_idxs[i])
+        class_assigned += num_classes_for_user
+
+    return dict_users
+
 def monitor_heartbeats(heartbeat_queue, num_users):
     client_status = {i: {"status": "idle", "last_heartbeat": "", "type": "normal"} for i in range(num_users)}
     while True:
@@ -740,6 +759,34 @@ def cleanup_client(local):
     local.stop_heartbeat()
     del local
 
+
+# 新增数据分布可视化函数
+def draw_data_distribution(dict_users, dataset, num_users, save_path='data_distribution.png'):
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # 统计每个客户端的类别分布
+    client_dist = {i: [0]*10 for i in range(num_users)}
+    for client_idx, indices in dict_users.items():
+        labels = [dataset[idx][1] for idx in indices]
+        for label in labels:
+            client_dist[client_idx][label] += 1
+
+    # 绘制子图
+    fig, axes = plt.subplots(nrows=num_users, ncols=1, figsize=(12, 3*num_users))
+    for i in range(num_users):
+        ax = axes[i]
+        ax.bar(range(10), client_dist[i], color='skyblue')
+        ax.set_title(f'Client {i} Data Distribution')
+        ax.set_xlabel('Class')
+        ax.set_ylabel('Count')
+        ax.set_xticks(range(10))
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
+
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+
 if __name__ == '__main__':
     torch.cuda.init()
     torch.multiprocessing.set_start_method("spawn", force=True)
@@ -747,12 +794,12 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=5, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
     parser.add_argument('--disconnect_prob', type=float, default=0.40, help='Disconnect probability')
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
     parser.add_argument("--correction_rate", type=float, default=1.0, help="Correction rate")
-    parser.add_argument("--local_ep", type=int, default=10, help="Local epochs")
-    parser.add_argument('--lr_decay', type=float, default=0.8, help='Learning rate decay factor')
+    parser.add_argument("--local_ep", type=int, default=5, help="Local epochs")
+    parser.add_argument('--lr_decay', type=float, default=0.95, help='Learning rate decay factor')
     parser.add_argument("--lr", type=float, default=0.001, help='Learning rate')
     args = parser.parse_args()
 
@@ -881,8 +928,14 @@ if __name__ == '__main__':
     )
 
     # ----------------------------------------------------------------
-    dict_users = dataset_iid(dataset_train, num_users)
+    class_distribution = [3, 3, 4]  # 每个客户端持有的类别数量
+    dict_users = dataset_non_iid(dataset_train, num_users, class_distribution)
     dict_users_test = dataset_iid(dataset_test, num_users)
+    draw_data_distribution(dict_users, dataset_train, num_users,
+                           save_path='output/data_distribution.png')
+
+    total_classes = sum(class_distribution)
+    client_weights = [num_classes / total_classes for num_classes in class_distribution]
 
     # ------------ Training And Testing -----------------
     net_glob_client.train()
@@ -996,11 +1049,14 @@ if __name__ == '__main__':
             print("No clients available for Federated Learning!")
 
         else:
+            # 选中当轮参与的客户端的权重
+            selected_weights = [client_weights[idx] for idx in idxs_users]
+
             # 客户端联邦平均
-            w_glob_client = FedAvg(w_locals_client, client_corrections, model_type='client')
+            w_glob_client = FedAvg(w_locals_client, client_corrections, model_type='client', weights=selected_weights)
 
             # 服务器端联邦平均
-            w_glob_server = FedAvg(w_glob_server_buffer, server_corrections, model_type='server')
+            w_glob_server = FedAvg(w_glob_server_buffer, server_corrections, model_type='server', weights=selected_weights)
 
             # Update client-side global model
             net_glob_client.load_state_dict(w_glob_client)

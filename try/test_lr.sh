@@ -21,7 +21,7 @@ second_python_file="CIFAR-10_no_corr_long_offline.py"
 
 for disconnect_round in 1; do
     for epochs in 20; do
-        for disconnect_prob in 0.40 0.50 0.60; do
+        for disconnect_prob in 0.50 0.60; do
             for local_ep in 10; do
               for lr in 0.0005 0.001 0.003; do
                   echo "Running with epochs=$epochs, disconnect_prob=$disconnect_prob, disconnect_round=$disconnect_round and local_ep=$local_ep"

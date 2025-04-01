@@ -762,12 +762,12 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=5, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
     parser.add_argument('--disconnect_prob', type=float, default=0.40, help='Disconnect probability')
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
-    parser.add_argument("--local_ep", type=int, default=10, help="Number of local epochs")
+    parser.add_argument("--local_ep", type=int, default=5, help="Number of local epochs")
     parser.add_argument('--lr_decay', type=float, default=0.8, help='Learning rate decay factor')
-    parser.add_argument("--lr", type=float, default=0.0003, help='Learning rate')
+    parser.add_argument("--lr", type=float, default=0.001, help='Learning rate')
     args = parser.parse_args()
 
     SEED = 1234
