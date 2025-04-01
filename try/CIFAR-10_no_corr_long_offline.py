@@ -704,12 +704,12 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script')
-    parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of epochs')
     parser.add_argument('--disconnect_prob', type=float, default=0.40, help='Disconnect probability')
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
     parser.add_argument("--local_ep", type=int, default=10, help="Number of local epochs")
     parser.add_argument('--lr_decay', type=float, default=0.95, help='Learning rate decay factor')
-    parser.add_argument("--lr", type=int, default=0.0003, help='Learning rate')
+    parser.add_argument("--lr", type=float, default=0.0003, help='Learning rate')
     args = parser.parse_args()
 
     SEED = 1234
@@ -960,7 +960,7 @@ if __name__ == '__main__':
     plt.ylabel('Training Time (s)')
     plt.title('Training Time Curve')
     plt.grid(True)
-    prefix = f"_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_le{args.local_ep}"
+    prefix = f"_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_le{args.local_ep}_lr{args.lr}"
     # 保存图片 按照当前时间保存 目录为 output/curve
     curve_filename = os.path.join(curve_dir, f'train_time_curve{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                           time.localtime()) + '.png')
