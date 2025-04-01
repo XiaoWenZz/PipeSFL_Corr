@@ -960,7 +960,7 @@ if __name__ == '__main__':
     plt.ylabel('Training Time (s)')
     plt.title('Training Time Curve')
     plt.grid(True)
-    prefix = f"_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_le{args.local_ep}"
+    prefix = f"_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_le{args.local_ep}_lr{args.lr}"
     # 保存图片 按照当前时间保存 目录为 output/curve
     curve_filename = os.path.join(curve_dir, f'train_time_curve{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                           time.localtime()) + '.png')
