@@ -709,7 +709,7 @@ if __name__ == '__main__':
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
     parser.add_argument("--local_ep", type=int, default=10, help="Number of local epochs")
     parser.add_argument('--lr_decay', type=float, default=0.85, help='Learning rate decay factor')
-    parser.add_argument("--lr", type=int, default=0.0003, help='Learning rate')
+    parser.add_argument("--lr", type=float, default=0.0003, help='Learning rate')
     args = parser.parse_args()
 
     SEED = 1234

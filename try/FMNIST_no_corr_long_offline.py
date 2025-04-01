@@ -16,6 +16,7 @@ from matplotlib import pyplot as plt
 # This program is Version1: Single program simulation
 # ==============================================================================
 import torch
+from sklearn.utils.multiclass import class_distribution
 from torch import nn
 from torchvision import transforms, datasets
 from torch.utils.data import DataLoader, Dataset
@@ -661,6 +662,36 @@ def dataset_iid(dataset, num_users):
 
     return dict_users
 
+def dataset_non_iid(dataset, num_users, class_distribution):
+    """
+    该函数用于将数据集按照指定的类别分布划分给不同的客户端，每个客户端持有独特类别的数据。
+    :param dataset: 输入的数据集
+    :param num_users: 客户端的数量
+    :param class_distribution: 每个客户端应持有的类别数量列表，其长度需与客户端数量一致，且总和应为数据集中的类别总数
+    :return: 一个字典，键为客户端编号，值为该客户端持有的样本索引集合
+    """
+    # 检查类别分布的合理性
+    if len(class_distribution) != num_users or sum(class_distribution) != 10:
+        raise ValueError("类别分布列表的长度必须等于客户端数量，且总和必须为 10。")
+
+    # 获取数据集中的标签列表
+    labels = [label for _, label in dataset]
+    # 统计每个类别的样本索引
+    class_idxs = {i: [] for i in range(10)}
+    for idx, label in enumerate(labels):
+        class_idxs[label].append(idx)
+
+    dict_users = {}
+    class_assigned = 0
+    for user in range(num_users):
+        dict_users[user] = set()
+        num_classes_for_user = class_distribution[user]
+        for i in range(class_assigned, class_assigned + num_classes_for_user):
+            dict_users[user].update(class_idxs[i])
+        class_assigned += num_classes_for_user
+
+    return dict_users
+
 
 def monitor_heartbeats(heartbeat_queue, num_users):
     client_status = {i: {"status": "idle", "last_heartbeat": "", "type": "normal"} for i in range(num_users)}
@@ -697,6 +728,33 @@ def cleanup_client(local):
     local.stop_heartbeat()
     del local
 
+# 新增数据分布可视化函数
+def draw_data_distribution(dict_users, dataset, num_users, save_path='data_distribution.png'):
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # 统计每个客户端的类别分布
+    client_dist = {i: [0]*10 for i in range(num_users)}
+    for client_idx, indices in dict_users.items():
+        labels = [dataset[idx][1] for idx in indices]
+        for label in labels:
+            client_dist[client_idx][label] += 1
+
+    # 绘制子图
+    fig, axes = plt.subplots(nrows=num_users, ncols=1, figsize=(12, 3*num_users))
+    for i in range(num_users):
+        ax = axes[i]
+        ax.bar(range(10), client_dist[i], color='skyblue')
+        ax.set_title(f'Client {i} Data Distribution')
+        ax.set_xlabel('Class')
+        ax.set_ylabel('Count')
+        ax.set_xticks(range(10))
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
+
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+
 if __name__ == '__main__':
     torch.cuda.init()
     torch.multiprocessing.set_start_method("spawn", force=True)
@@ -709,7 +767,7 @@ if __name__ == '__main__':
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
     parser.add_argument("--local_ep", type=int, default=10, help="Number of local epochs")
     parser.add_argument('--lr_decay', type=float, default=0.8, help='Learning rate decay factor')
-    parser.add_argument("--lr", type=int, default=0.0003, help='Learning rate')
+    parser.add_argument("--lr", type=float, default=0.0003, help='Learning rate')
     args = parser.parse_args()
 
     SEED = 1234
@@ -825,8 +883,11 @@ if __name__ == '__main__':
     )
 
     # ----------------------------------------------------------------
-    dict_users = dataset_iid(dataset_train, num_users)
+    class_distribution = [3, 3, 4]  # 每个客户端持有的类别数量
+    dict_users = dataset_non_iid(dataset_train, num_users, class_distribution)
     dict_users_test = dataset_iid(dataset_test, num_users)
+    draw_data_distribution(dict_users, dataset_train, num_users,
+                           save_path='output/data_distribution.png')
 
     # ------------ Training And Testing -----------------
     net_glob_client.train()
