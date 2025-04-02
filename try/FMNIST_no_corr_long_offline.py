@@ -595,9 +595,15 @@ class Client(object):
                                                             self.num_users)
 
                         fx.backward(dfx)
-                        torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1.0)
+                        # torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=5.0)
                         optimizer_client.step()
-                        print(f"[Debug] Client梯度范数: {torch.norm(net.parameters())}")
+                        # 计算所有参数梯度的范数
+                        params = [p.grad for p in net.parameters() if p.grad is not None]
+                        if len(params) == 0:
+                            total_norm = 0.0
+                        else:
+                            total_norm = torch.norm(torch.cat([p.view(-1) for p in params]))
+                        print(f"[Debug] Client梯度范数: {total_norm}")
 
                 net.to('cpu')
                 net_glob_server.to('cpu')
@@ -781,7 +787,7 @@ if __name__ == '__main__':
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
     parser.add_argument("--local_ep", type=int, default=5, help="Number of local epochs")
     parser.add_argument('--lr_decay', type=float, default=0.95, help='Learning rate decay factor')
-    parser.add_argument("--lr", type=float, default=0.0001, help='Learning rate')
+    parser.add_argument("--lr", type=float, default=0.001, help='Learning rate')
     args = parser.parse_args()
 
     SEED = 1234

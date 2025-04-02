@@ -164,13 +164,11 @@ def FedAvg(w, corrections, model_type):
         return w_avg
 
     for k in param_keys:
-        total = torch.zeros_like(w_avg[k])
-        for i, params in enumerate(w):
-            # 应用权重
+        total = w_avg[k].clone()
+        for i, params in enumerate(w[1:], start=1):
             total += params[k].cpu()
-        w_avg[k] = total
+        w_avg[k] = total / len(w)
     return w_avg
-
 
 def calculate_accuracy(fx, y):
     preds = fx.max(1, keepdim=True)[1]
@@ -212,14 +210,14 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     # --------backward prop--------------
     loss.backward()
     # 梯度裁剪
-    torch.nn.utils.clip_grad_norm_(net_glob_server.parameters(), max_norm=1.0)
+    # torch.nn.utils.clip_grad_norm_(net_glob_server.parameters(), max_norm=5.0)
     # 检查梯度是否包含NaN
     if torch.isnan(fx_client.grad).any():
         print(f"[Error] Server 梯度包含NaN，Client {idx} 的参数将被标记为无效")
         idx_round_disconnected.append(idx)
         return None, net_glob_server  # 返回None表示梯度无效
     dfx_client = fx_client.grad.clone().detach()
-    print(f"[Debug] Server梯度范数: {torch.norm(dfx_client)}")
+    # print(f"[Debug] Server梯度范数: {torch.norm(dfx_client)}")
     optimizer_server.step()
 
     batch_loss_train.append(loss.item())
@@ -602,13 +600,19 @@ class Client(object):
                                                             self.num_users)
 
                         fx.backward(dfx)
-                        torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1.0)
+                        # torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1.0)
                         # 检查梯度类型
                         for param in net.parameters():
                             assert param.grad.dtype == torch.float, "Gradient type is not float"
                         optimizer_client.step()
 
-                        print(f"[Debug] Client梯度范数: {torch.norm(net.parameters())}")
+                        # # 计算所有参数梯度的范数
+                        # params = [p.grad for p in net.parameters() if p.grad is not None]
+                        # if len(params) == 0:
+                        #     total_norm = 0.0
+                        # else:
+                        #     total_norm = torch.norm(torch.cat([p.view(-1) for p in params]))
+                        # print(f"[Debug] Client梯度范数: {total_norm}")
 
                 net.to('cpu')
                 net_glob_server.to('cpu')
@@ -815,7 +819,7 @@ if __name__ == '__main__':
     parser.add_argument("--correction_rate", type=float, default=1.0, help="Correction rate")
     parser.add_argument("--local_ep", type=int, default=5, help="Local epochs")
     parser.add_argument('--lr_decay', type=float, default=0.95, help='Learning rate decay factor')
-    parser.add_argument("--lr", type=float, default=0.0001, help='Learning rate')
+    parser.add_argument("--lr", type=float, default=0.001, help='Learning rate')
     args = parser.parse_args()
 
     SEED = 1234
