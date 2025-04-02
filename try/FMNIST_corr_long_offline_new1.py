@@ -811,7 +811,7 @@ if __name__ == '__main__':
     parser.add_argument("--correction_rate", type=float, default=1.0, help="Correction rate")
     parser.add_argument("--local_ep", type=int, default=5, help="Local epochs")
     parser.add_argument('--lr_decay', type=float, default=0.95, help='Learning rate decay factor')
-    parser.add_argument("--lr", type=float, default=0.001, help='Learning rate')
+    parser.add_argument("--lr", type=float, default=0.0001, help='Learning rate')
     args = parser.parse_args()
 
     SEED = 1234
@@ -1115,10 +1115,10 @@ if __name__ == '__main__':
     print("Training and Evaluation completed!")
 
     # 确保输出目录存在
-    curve_dir = 'output/curve/cifar/long_offline'
-    model_dir = 'output/model/cifar/long_offline'
-    acc_dir = 'output/acc/cifar/long_offline'
-    loss_dir = 'output/loss/cifar/long_offline'
+    curve_dir = 'output/curve/fmnist/long_offline'
+    model_dir = 'output/model/fmnist/long_offline'
+    acc_dir = 'output/acc/fmnist/long_offline'
+    loss_dir = 'output/loss/fmnist/long_offline'
 
     for directory in [curve_dir, model_dir, acc_dir, loss_dir]:
         if not os.path.exists(directory):
@@ -1130,7 +1130,7 @@ if __name__ == '__main__':
     plt.ylabel('Training Time (s)')
     plt.title('Training Time Curve')
     plt.grid(True)
-    prefix = f"_FMNIT_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_cr{args.correction_rate:.2f}_le{args.local_ep}_lr{args.lr}"
+    prefix = f"_FMNIST_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_cr{args.correction_rate:.2f}_le{args.local_ep}_lr{args.lr}"
     # 保存图片 按照当前时间保存 目录为 output/curve
     curve_filename = os.path.join(curve_dir, f'train_time_curve{prefix}_' + time.strftime("%Y%m%d-%H%M%S", time.localtime()) + '.png')
     plt.savefig(curve_filename)

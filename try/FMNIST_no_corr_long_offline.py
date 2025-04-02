@@ -778,7 +778,7 @@ if __name__ == '__main__':
     parser.add_argument('--disconnect_round', type=int, default=1, help='Disconnect round')
     parser.add_argument("--local_ep", type=int, default=5, help="Number of local epochs")
     parser.add_argument('--lr_decay', type=float, default=0.95, help='Learning rate decay factor')
-    parser.add_argument("--lr", type=float, default=0.001, help='Learning rate')
+    parser.add_argument("--lr", type=float, default=0.0001, help='Learning rate')
     args = parser.parse_args()
 
     SEED = 1234
@@ -1032,10 +1032,10 @@ if __name__ == '__main__':
     print("Training and Evaluation completed!")
 
     # 确保输出目录存在
-    curve_dir = 'output/curve/cifar/long_offline'
-    model_dir = 'output/model/cifar/long_offline'
-    acc_dir = 'output/acc/cifar/long_offline'
-    loss_dir = 'output/loss/cifar/long_offline'
+    curve_dir = 'output/curve/fmnist/long_offline'
+    model_dir = 'output/model/fmnist/long_offline'
+    acc_dir = 'output/acc/fmnist/long_offline'
+    loss_dir = 'output/loss/fmnist/long_offline'
 
     for directory in [curve_dir, model_dir, acc_dir, loss_dir]:
         if not os.path.exists(directory):
