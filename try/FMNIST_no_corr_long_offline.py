@@ -218,6 +218,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     # --------backward prop--------------
     loss.backward()
     dfx_client = fx_client.grad.clone().detach()
+    print(f"[Debug] Server梯度范数: {torch.norm(dfx_client)}")
     optimizer_server.step()
 
     batch_loss_train.append(loss.item())
@@ -594,7 +595,9 @@ class Client(object):
                                                             self.num_users)
 
                         fx.backward(dfx)
+                        torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1.0)
                         optimizer_client.step()
+                        print(f"[Debug] Client梯度范数: {torch.norm(net.parameters())}")
 
                 net.to('cpu')
                 net_glob_server.to('cpu')
