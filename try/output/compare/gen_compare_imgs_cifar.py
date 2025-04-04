@@ -147,9 +147,9 @@ def plot_comparison(no_corr_file, corr_files, output_file):
 
 
 # 定义文件夹路径
-no_corr_folder = 'csvs/no_corr/fmnist'
-corr_folder = 'csvs/corr/fmnist'
-output_folder = 'fmnist/imgs'
+no_corr_folder = 'csvs/no_corr/cifar'
+corr_folder = 'csvs/corr/cifar'
+output_folder = 'cifar/imgs'
 
 # 创建输出文件夹（如果不存在）
 if not os.path.exists(output_folder):
