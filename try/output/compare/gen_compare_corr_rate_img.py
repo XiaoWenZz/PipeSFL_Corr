@@ -2,7 +2,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 根据提供的map key 为离线率p value 为 acc 绘制图像
+# 根据提供的map key 为修正率cr value 为 acc 绘制图像
 map_of_corr_fmnist = {
     0.3: 0.62,
     0.4: 0.59,
@@ -35,37 +35,4 @@ map_without_corr_cifar10 = {
     0.7: 0.39,
 }
 
-output_path_fmnist = "p_rate_fmnist.png"
-output_path_cifar10 = "p_rate_cifar10.png"
-
-def plot_map_fmnist():
-    plt.figure(figsize=(10, 6))
-    plt.plot(list(map_of_corr_fmnist.keys()), list(map_of_corr_fmnist.values()), label='With Correction', marker='o')
-    plt.plot(list(map_without_corr_fmnist.keys()), list(map_without_corr_fmnist.values()), label='Without Correction', marker='o')
-    plt.title('Offline Rate vs Accuracy on FMNIST')
-    plt.xlabel('Offline Rate (p)')
-    plt.ylabel('Accuracy')
-    plt.xticks(list(map_of_corr_fmnist.keys()))
-    plt.yticks(np.arange(0.5, 0.65, 0.01))
-    plt.legend()
-    plt.grid()
-    plt.savefig(output_path_fmnist)
-    plt.show()
-
-def plot_map_cifar10():
-    plt.figure(figsize=(10, 6))
-    plt.plot(list(map_of_corr_cifar10.keys()), list(map_of_corr_cifar10.values()), label='With Correction', marker='o')
-    plt.plot(list(map_without_corr_cifar10.keys()), list(map_without_corr_cifar10.values()), label='Without Correction', marker='o')
-    plt.title('Offline Rate vs Accuracy on CIFAR-10')
-    plt.xlabel('Offline Rate (p)')
-    plt.ylabel('Accuracy')
-    plt.xticks(list(map_of_corr_cifar10.keys()))
-    plt.yticks(np.arange(0.35, 0.5, 0.01))
-    plt.legend()
-    plt.grid()
-    plt.savefig(output_path_cifar10)
-    plt.show()
-
-if __name__ == "__main__":
-    plot_map_fmnist()
-    plot_map_cifar10()
+output_path_fmnist = "corr_rate_fmnist.png"

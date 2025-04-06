@@ -134,7 +134,7 @@ def plot_comparison(no_corr_file, corr_files, output_file):
     # 设置图表属性
     plt.xlabel('Epochs')
     plt.ylabel(y_label)
-    plt.title(title)
+    # plt.title(title)
     plt.legend()
     plt.grid(True)
 
