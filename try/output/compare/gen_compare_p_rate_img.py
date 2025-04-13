@@ -1,4 +1,3 @@
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -38,33 +37,40 @@ map_without_corr_cifar10 = {
 output_path_fmnist = "p_rate_fmnist.png"
 output_path_cifar10 = "p_rate_cifar10.png"
 
+
 def plot_map_fmnist():
     plt.figure(figsize=(10, 6))
-    plt.plot(list(map_of_corr_fmnist.keys()), list(map_of_corr_fmnist.values()), label='With Correction', marker='o')
-    plt.plot(list(map_without_corr_fmnist.keys()), list(map_without_corr_fmnist.values()), label='Without Correction', marker='o')
-    plt.title('Offline Rate vs Accuracy on FMNIST')
-    plt.xlabel('Offline Rate (p)')
-    plt.ylabel('Accuracy')
-    plt.xticks(list(map_of_corr_fmnist.keys()))
-    plt.yticks(np.arange(0.5, 0.65, 0.01))
+    plt.plot(list(map_of_corr_fmnist.keys()), list(map_of_corr_fmnist.values()),
+             label='With Correction', marker='o')
+    plt.plot(list(map_without_corr_fmnist.keys()), list(map_without_corr_fmnist.values()),
+             label='Without Correction', marker='o')
+    plt.title('Offline Rate vs Accuracy on FMNIST', fontsize=16)
+    plt.xlabel('Offline Rate (p)', fontsize=14)
+    plt.ylabel('Accuracy', fontsize=14)
+    plt.xticks(list(map_of_corr_fmnist.keys()), fontsize=14)
+    plt.yticks(np.arange(0.5, 0.65, 0.02), fontsize=14)
     plt.legend()
     plt.grid()
     plt.savefig(output_path_fmnist)
     plt.show()
 
+
 def plot_map_cifar10():
     plt.figure(figsize=(10, 6))
-    plt.plot(list(map_of_corr_cifar10.keys()), list(map_of_corr_cifar10.values()), label='With Correction', marker='o')
-    plt.plot(list(map_without_corr_cifar10.keys()), list(map_without_corr_cifar10.values()), label='Without Correction', marker='o')
-    plt.title('Offline Rate vs Accuracy on CIFAR-10')
-    plt.xlabel('Offline Rate (p)')
-    plt.ylabel('Accuracy')
-    plt.xticks(list(map_of_corr_cifar10.keys()))
-    plt.yticks(np.arange(0.35, 0.5, 0.01))
+    plt.plot(list(map_of_corr_cifar10.keys()), list(map_of_corr_cifar10.values()),
+             label='Corr', marker='o')
+    plt.plot(list(map_without_corr_cifar10.keys()), list(map_without_corr_cifar10.values()),
+             label='No Corre', marker='o')
+    plt.title('Offline Rate vs Accuracy on CIFAR-10', fontsize=16)
+    plt.xlabel('Offline Rate (p)', fontsize=14)
+    plt.ylabel('Accuracy', fontsize=14)
+    plt.xticks(list(map_of_corr_cifar10.keys()), fontsize=14)
+    plt.yticks(np.arange(0.35, 0.5, 0.02), fontsize=14)
     plt.legend()
     plt.grid()
     plt.savefig(output_path_cifar10)
     plt.show()
+
 
 if __name__ == "__main__":
     plot_map_fmnist()
