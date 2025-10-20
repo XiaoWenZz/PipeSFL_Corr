@@ -30,7 +30,7 @@ import multiprocessing
 
 # import matplotlib
 # matplotlib.use('Agg')
-# import matplotlib.pyplot as plt
+# import matplotlnib.pyplot as plt
 import copy
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152

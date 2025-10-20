@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python_path="D:/Anaconda3/envs/pytorch/python.exe"
+python_path="/home/conda/bin/python"
 python_file_cifar="CIFAR_corr_long_offline_new2.py"
 second_python_file_cifar="CIFAR_no_corr_long_offline.py"
 python_file_fmnist="FMNIST_corr_long_offline_new1.py"
