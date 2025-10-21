@@ -1,10 +1,10 @@
 #!/bin/bash
 
 python_path="/home/conda/bin/python"
-python_file_cifar="CIFAR_corr_long_offline_new2.py"
-second_python_file_cifar="CIFAR_no_corr_long_offline.py"
-python_file_fmnist="FMNIST_corr_long_offline_new1.py"
-second_python_file_fmnist="FMNIST_no_corr_long_offline.py"
+python_file_cifar="CIFAR_corr_long_offline_avg_first_linux.py"
+second_python_file_cifar="CIFAR_no_corr_long_offline_avg_first_linux.py"
+#python_file_fmnist="FMNIST_corr_long_offline_new1.py"
+#second_python_file_fmnist="FMNIST_no_corr_long_offline.py"
 
 
 for disconnect_round in 1; do
@@ -17,10 +17,10 @@ for disconnect_round in 1; do
                       $python_path $python_file_cifar --epochs $epochs --disconnect_prob $disconnect_prob --disconnect_round $disconnect_round --correction_rate $correction_rate --local_ep $local_ep --lr $lr
                       echo "CIFAR Running with epochs=$epochs, disconnect_prob=$disconnect_prob, disconnect_round=$disconnect_round and local_ep=$local_ep"
                       $python_path $second_python_file_cifar --epochs $epochs --disconnect_prob $disconnect_prob --disconnect_round $disconnect_round --local_ep $local_ep --lr $lr
-                      echo "FMNIST Running with epochs=$epochs, disconnect_prob=$disconnect_prob, disconnect_round=$disconnect_round, correction_rate=$correction_rate and local_ep=$local_ep"
-                      $python_path $python_file_fmnist --epochs $epochs --disconnect_prob $disconnect_prob --disconnect_round $disconnect_round --correction_rate $correction_rate --local_ep $local_ep --lr $lr
-                      echo "FMNIST Running with epochs=$epochs, disconnect_prob=$disconnect_prob, disconnect_round=$disconnect_round and local_ep=$local_ep"
-                      $python_path $second_python_file_fmnist --epochs $epochs --disconnect_prob $disconnect_prob --disconnect_round $disconnect_round --local_ep $local_ep --lr $lr
+#                      echo "FMNIST Running with epochs=$epochs, disconnect_prob=$disconnect_prob, disconnect_round=$disconnect_round, correction_rate=$correction_rate and local_ep=$local_ep"
+#                      $python_path $python_file_fmnist --epochs $epochs --disconnect_prob $disconnect_prob --disconnect_round $disconnect_round --correction_rate $correction_rate --local_ep $local_ep --lr $lr
+#                      echo "FMNIST Running with epochs=$epochs, disconnect_prob=$disconnect_prob, disconnect_round=$disconnect_round and local_ep=$local_ep"
+#                      $python_path $second_python_file_fmnist --epochs $epochs --disconnect_prob $disconnect_prob --disconnect_round $disconnect_round --local_ep $local_ep --lr $lr
                   done
                 done
             done
