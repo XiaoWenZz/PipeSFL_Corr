@@ -2,3 +2,5 @@ data/
 output/model/
 try/output/model
 try/data
+try_new/data
+try_new/output/model

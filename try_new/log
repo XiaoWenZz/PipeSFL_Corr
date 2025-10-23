@@ -1,0 +1,1782 @@
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/site-packages/torch/nn/modules/linear.py", line 125, in forward
+    return F.linear(input, self.weight, self.bias)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Expected all tensors to be on the same device, but got mat1 is on cpu, different from other tensors on cuda:0 (when checking argument in method wrapper_CUDA_addmm)
+[Error] An unexpected error occurred:
+^[[A^[[A^[[A^[[B^[[A^[[A^[[B^[[A^[[A^[[B^[[A^CProcess Process-2:
+Exception ignored in atexit callback: <function _exit_function at 0x7c9741403f60>
+Traceback (most recent call last):
+  File "/home/conda/lib/python3.12/multiprocessing/util.py", line 360, in _exit_function
+    p.join()
+  File "/home/conda/lib/python3.12/multiprocessing/process.py", line 149, in join
+    res = self._popen.wait(timeout)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/multiprocessing/popen_fork.py", line 43, in wait
+    return self.poll(os.WNOHANG if timeout == 0.0 else 0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/multiprocessing/popen_fork.py", line 27, in poll
+    pid, sts = os.waitpid(self.pid, flag)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt:
+Traceback (most recent call last):
+  File "/home/xiaowen/PipeSFL_Corr/try_new/CIFAR_corr_apt_alpha.py", line 612, in monitor_heartbeats
+    idx, status, timestamp = heartbeat_queue.get(timeout=30)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in get
+  File "/home/conda/lib/python3.12/multiprocessing/managers.py", line 827, in _callmethod
+    conn.send((self._id, methodname, args, kwds))
+  File "/home/conda/lib/python3.12/multiprocessing/connection.py", line 206, in send
+    self._send_bytes(_ForkingPickler.dumps(obj))
+  File "/home/conda/lib/python3.12/multiprocessing/connection.py", line 427, in _send_bytes
+    self._send(header + buf)
+  File "/home/conda/lib/python3.12/multiprocessing/connection.py", line 384, in _send
+    n = write(self._handle, buf)
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+(pytorch) xiaowen@user:~/PipeSFL_Corr/try_new$
+(pytorch) xiaowen@user:~/PipeSFL_Corr/try_new$
+(pytorch) xiaowen@user:~/PipeSFL_Corr/try_new$
+(pytorch) xiaowen@user:~/PipeSFL_Corr/try_new$ /home/conda/bin/python CIFAR_corr_apt_alpha.py
+NVIDIA GeForce RTX 5090
+Available GPUs: [0]
+---------PipeSFLV1 ResNet50 on CIFAR-10 with RL Correction----------
+device: cuda
+
+
+
+      (conv1): Conv2d(256, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+      (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (conv3): Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+      (bn3): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential()
+    )
+  )
+)
+
+    (1): BasicBlock(
+      (conv1): Conv2d(1024, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+      (bn1): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (conv2): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (conv3): Conv2d(256, 1024, kernel_size=(1, 1), stride=(1, 1), bias=False)
+      (bn3): BatchNorm2d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential()
+    )
+    (2): BasicBlock(
+      (conv1):
+      (bn1): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (conv3): Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
+      (bn3): BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential()
+    )
+    (2): BasicBlock(
+      (conv1): Conv2d(2048, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+      (bn1): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (conv3): Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
+      (bn3): BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential()
+    )
+  )
+  (avgpool): AdaptiveAvgPool2d(output_size=(1, 1))
+  (fc): Linear(in_features=2048, out_features=10, bias=True)
+)
+[Round 0] Current user's idx: 0
+[send_heartbeat] Client0 随机数: 0.6369616873214543
+client  0  : 1 / 65
+client  0  : 2 / 65
+client  0  : 3 / 65
+client  0  : 4 / 65
+client  0  : 5 / 65
+client  0  : 6 / 65
+client  0  : 7 / 65
+client  0  : 8 / 65
+client  0  : 9 / 65
+client  0  : 10 / 65
+client  0  : 11 / 65
+client  0  : 12 / 65
+client  0  : 13 / 65
+client  0  : 14 / 65
+client  0  : 15 / 65
+client  0  : 16 / 65
+client  0  : 17 / 65
+client  0  : 18 / 65
+client  0  : 19 / 65
+client  0  : 20 / 65
+client  0  : 21 / 65
+client  0  : 22 / 65
+client  0  : 23 / 65
+client  0  : 24 / 65
+client  0  : 25 / 65
+client  0  : 26 / 65
+client  0  : 27 / 65
+client  0  : 28 / 65
+client  0  : 29 / 65
+client  0  : 30 / 65
+[send_heartbeat] Client0 随机数: 0.6369616873214543
+client  0  : 31 / 65
+client  0  : 32 / 65
+client  0  : 33 / 65
+client  0  : 34 / 65
+client  0  : 35 / 65
+client  0  : 36 / 65
+client  0  : 37 / 65
+client  0  : 38 / 65
+client  0  : 39 / 65
+client  0  : 40 / 65
+client  0  : 41 / 65
+client  0  : 42 / 65
+client  0  : 43 / 65
+client  0  : 44 / 65
+client  0  : 45 / 65
+client  0  : 46 / 65
+client  0  : 47 / 65
+client  0  : 48 / 65
+client  0  : 49 / 65
+client  0  : 50 / 65
+client  0  : 51 / 65
+client  0  : 52 / 65
+client  0  : 53 / 65
+client  0  : 54 / 65
+client  0  : 55 / 65
+client  0  : 56 / 65
+client  0  : 57 / 65
+client  0  : 58 / 65
+client  0  : 59 / 65
+client  0  : 60 / 65
+client  0  : 61 / 65
+client  0  : 62 / 65
+[send_heartbeat] Client0 随机数: 0.6369616873214543
+client  0  : 63 / 65
+client  0  : 64 / 65
+ Client0 Train => Local Epoch: 4        Acc: 39.940     Loss: 1.6337
+[Debug] idx_collect: [np.int64(0)]
+[Debug] idx_disconnected: []
+client  0  : 65 / 65
+Client0 Test =>                         Acc: 25.504     Loss: 18.9115
+[Round 0] Current user's idx: 1
+[send_heartbeat] Client1 随机数: 0.5118216247002567
+client  1  : 1 / 65
+client  1  : 2 / 65
+client  1  : 3 / 65
+client  1  : 4 / 65
+client  1  : 5 / 65
+client  1  : 6 / 65
+client  1  : 7 / 65
+client  1  : 8 / 65
+client  1  : 9 / 65
+client  1  : 10 / 65
+client  1  : 11 / 65
+client  1  : 12 / 65
+client  1  : 13 / 65
+client  1  : 14 / 65
+client  1  : 15 / 65
+client  1  : 16 / 65
+client  1  : 17 / 65
+client  1  : 18 / 65
+client  1  : 19 / 65
+client  1  : 20 / 65
+client  1  : 21 / 65
+client  1  : 22 / 65
+client  1  : 23 / 65
+client  1  : 24 / 65
+client  1  : 25 / 65
+[Info] Client0 心跳线程结束
+client  1  : 26 / 65
+client  1  : 27 / 65
+client  1  : 28 / 65
+client  1  : 29 / 65
+client  1  : 30 / 65
+client  1  : 31 / 65
+client  1  : 32 / 65
+[send_heartbeat] Client1 随机数: 0.5118216247002567
+client  1  : 33 / 65
+client  1  : 34 / 65
+client  1  : 35 / 65
+client  1  : 36 / 65
+client  1  : 37 / 65
+client  1  : 38 / 65
+client  1  : 39 / 65
+client  1  : 40 / 65
+client  1  : 41 / 65
+client  1  : 42 / 65
+client  1  : 43 / 65
+client  1  : 44 / 65
+client  1  : 45 / 65
+client  1  : 46 / 65
+client  1  : 47 / 65
+client  1  : 48 / 65
+client  1  : 49 / 65
+client  1  : 50 / 65
+client  1  : 51 / 65
+client  1  : 52 / 65
+client  1  : 53 / 65
+client  1  : 54 / 65
+client  1  : 55 / 65
+client  1  : 56 / 65
+client  1  : 57 / 65
+client  1  : 58 / 65
+client  1  : 59 / 65
+client  1  : 60 / 65
+client  1  : 61 / 65
+client  1  : 62 / 65
+client  1  : 63 / 65
+client  1  : 64 / 65
+ Client1 Train => Local Epoch: 4        Acc: 25.582     Loss: 4.8822
+[Debug] idx_collect: [np.int64(0), np.int64(1)]
+[Debug] idx_disconnected: []
+client  1  : 65 / 65
+[send_heartbeat] Client1 随机数: 0.5118216247002567
+Client1 Test =>                         Acc: 28.246     Loss: 9.4082
+[Round 0] Current user's idx: 2
+[send_heartbeat] Client2 随机数: 0.2616121342493164
+client  2  : 1 / 65
+client  2  : 2 / 65
+client  2  : 3 / 65
+client  2  : 4 / 65
+client  2  : 5 / 65
+client  2  : 6 / 65
+client  2  : 7 / 65
+client  2  : 8 / 65
+client  2  : 9 / 65
+client  2  : 10 / 65
+client  2  : 11 / 65
+client  2  : 12 / 65
+client  2  : 13 / 65
+client  2  : 14 / 65
+client  2  : 15 / 65
+client  2  : 16 / 65
+client  2  : 17 / 65
+client  2  : 18 / 65
+client  2  : 19 / 65
+client  2  : 20 / 65
+client  2  : 21 / 65
+client  2  : 22 / 65
+client  2  : 23 / 65
+client  2  : 24 / 65
+client  2  : 25 / 65
+client  2  : 26 / 65
+client  2  : 27 / 65
+client  2  : 28 / 65
+[Info] Client1 心跳线程结束
+client  2  : 29 / 65
+client  2  : 30 / 65
+client  2  : 31 / 65
+client  2  : 32 / 65
+[send_heartbeat] Client2 随机数: 0.2616121342493164
+[Random] Client2 随机数: 0.2616121342493164
+[Disconnect] Client2 断开 (概率40.0%)
+[Abort] Client2 训练期间断开，终止训练
+[Abort] Client2 训练期间断开，终止训练
+ Client2 断开连接，使用RL动态校正变量
+[RL Decision] Client2 修正率α = 0.3000
+[RL Feedback] Client2 奖励 = 0.0000
+[Round 0] Current user's idx: 3
+[send_heartbeat] Client3 随机数: 0.08564916714362436
+client  3  : 1 / 65
+client  3  : 2 / 65
+client  3  : 3 / 65
+client  3  : 4 / 65
+client  3  : 5 / 65
+client  3  : 6 / 65
+client  3  : 7 / 65
+client  3  : 8 / 65
+client  3  : 9 / 65
+client  3  : 10 / 65
+client  3  : 11 / 65
+client  3  : 12 / 65
+client  3  : 13 / 65
+client  3  : 14 / 65
+client  3  : 15 / 65
+client  3  : 16 / 65
+client  3  : 17 / 65
+client  3  : 18 / 65
+client  3  : 19 / 65
+client  3  : 20 / 65
+client  3  : 21 / 65
+client  3  : 22 / 65
+client  3  : 23 / 65
+client  3  : 24 / 65
+client  3  : 25 / 65
+client  3  : 26 / 65
+client  3  : 27 / 65
+client  3  : 28 / 65
+client  3  : 29 / 65
+client  3  : 30 / 65
+[Info] Client2 心跳线程结束
+client  3  : 31 / 65
+[send_heartbeat] Client3 随机数: 0.08564916714362436
+[Random] Client3 随机数: 0.08564916714362436
+[Disconnect] Client3 断开 (概率40.0%)
+[Abort] Client3 训练期间断开，终止训练
+[update_fed_check] acc_train_collect appended once, current length: 1
+[update_fed_check] current idx_collect: [np.int64(0), np.int64(1)]
+[update_fed_check] current idx_disconnected: [np.int64(2), np.int64(3)]
+[update_fed_check] acc_test_collect appended once, current length: 1
+[Abort] Client3 训练期间断开，终止训练
+ Client3 断开连接，使用RL动态校正变量
+[RL Decision] Client3 修正率α = 0.4899
+[RL Feedback] Client3 奖励 = 0.0000
+------------------------------------------------------------
+------ Fed Server: Federation process at Client-Side -------
+------------------------------------------------------------
+====================== PipeSFL V1 ========================
+========== Train: Round   0 Time: 63.888959s ===============
+==========================================================
+[Reconnect] Client2 重新连接倒计时: 2
+[Reconnect] Client3 重新连接倒计时: 2
+[Debug] len(acc_test_collect): 1
+==========================================================
+[sort idxs_users] sort idxs_users
+[Round 1] Sorted idxs_users: [np.int64(2), np.int64(3), np.int64(1), np.int64(0)]
+[Round 1] Current user's idx: 2
+[Skip] Client2 断开，跳过训练
+ Client2 断开连接，使用RL动态校正变量
+[RL Decision] Client2 修正率α = 0.3000
+[RL Feedback] Client2 奖励 = 0.0000
+[Round 1] Current user's idx: 3
+[Skip] Client3 断开，跳过训练
+ Client3 断开连接，使用RL动态校正变量
+[RL Decision] Client3 修正率α = 0.4902
+[RL Feedback] Client3 奖励 = 0.0000
+[Round 1] Current user's idx: 1
+[send_heartbeat] Client1 随机数: 0.2616121342493164
+client  1  : 1 / 65
+client  1  : 2 / 65
+client  1  : 3 / 65
+client  1  : 4 / 65
+client  1  : 5 / 65
+client  1  : 6 / 65
+client  1  : 7 / 65
+client  1  : 8 / 65
+client  1  : 9 / 65
+client  1  : 10 / 65
+client  1  : 11 / 65
+client  1  : 12 / 65
+client  1  : 13 / 65
+client  1  : 14 / 65
+^[[A^[[A^[[A^[[A^[[A^[[A^[[Aclient  1  : 15 / 65
+^[[A^[[Bclient  1  : 16 / 65
+client  1  : 17 / 65
+client  1  : 18 / 65
+client  1  : 19 / 65
+client  1  : 20 / 65
+ Client1 断开连接，使用RL动态校正变量
+[RL Decision] Client1 修正率α = 0.6024
+[RL Feedback] Client1 奖励 = 0.0000
+[Round 3] Current user's idx: 0
+[Skip] Client0 断开，跳过训练
+ Client0 断开连接，使用RL动态校正变量
+[RL Decision] Client0 修正率α = 0.3000
+[RL Feedback] Client0 奖励 = 0.0000
+[Round 3] Current user's idx: 2
+[send_heartbeat] Client2 随机数: 0.8050029237453802
+client  2  : 1 / 65
+client  2  : 2 / 65
+client  2  : 3 / 65
+client  2  : 4 / 65
+client  2  : 5 / 65
+client  2  : 6 / 65
+client  2  : 7 / 65
+client  2  : 8 / 65
+client  2  : 9 / 65
+client  2  : 10 / 65
+client  2  : 11 / 65
+client  2  : 12 / 65
+client  2  : 13 / 65
+client  2  : 14 / 65
+client  2  : 15 / 65
+client  2  : 16 / 65
+client  2  : 17 / 65
+client  2  : 18 / 65
+client  2  : 19 / 65
+client  2  : 20 / 65
+client  2  : 21 / 65
+client  2  : 22 / 65
+client  2  : 23 / 65
+client  2  : 24 / 65
+client  2  : 25 / 65
+client  2  : 26 / 65
+client  2  : 27 / 65
+client  2  : 28 / 65
+client  2  : 29 / 65
+[Info] Client0 心跳线程结束
+client  2  : 30 / 65
+[Info] Client1 心跳线程结束
+client  2  : 31 / 65
+[Info] Client0 心跳线程结束
+[send_heartbeat] Client2 随机数: 0.8050029237453802
+client  2  : 32 / 65
+client  2  : 33 / 65
+client  2  : 34 / 65
+client  2  : 35 / 65
+client  2  : 36 / 65
+client  2  : 37 / 65
+client  2  : 38 / 65
+client  2  : 39 / 65
+client  2  : 40 / 65
+client  2  : 41 / 65
+client  2  : 42 / 65
+client  2  : 43 / 65
+client  2  : 44 / 65
+client  2  : 45 / 65
+client  2  : 46 / 65
+client  2  : 47 / 65
+client  2  : 48 / 65
+client  2  : 49 / 65
+client  2  : 50 / 65
+client  2  : 51 / 65
+client  2  : 52 / 65
+client  2  : 53 / 65
+client  2  : 54 / 65
+client  2  : 55 / 65
+client  2  : 56 / 65
+client  2  : 57 / 65
+client  2  : 58 / 65
+client  2  : 59 / 65
+client  2  : 60 / 65
+client  2  : 61 / 65
+client  2  : 62 / 65
+client  2  : 63 / 65
+[send_heartbeat] Client2 随机数: 0.8050029237453802
+client  2  : 64 / 65
+ Client2 Train => Local Epoch: 4        Acc: 45.436     Loss: 1.7221
+[Debug] idx_collect: [np.int64(2)]
+[Debug] idx_disconnected: [np.int64(1), np.int64(0)]
+client  2  : 65 / 65
+Client2 Test =>                         Acc: 28.073     Loss: 58.8050
+[Round 3] Current user's idx: 3
+[send_heartbeat] Client3 随机数: 0.5381643514719432
+client  3  : 1 / 65
+client  3  : 2 / 65
+client  3  : 3 / 65
+client  3  : 4 / 65
+client  3  : 5 / 65
+client  3  : 6 / 65
+client  3  : 7 / 65
+client  3  : 8 / 65
+client  3  : 9 / 65
+client  3  : 10 / 65
+client  3  : 11 / 65
+client  3  : 12 / 65
+client  3  : 13 / 65
+client  3  : 14 / 65
+client  3  : 15 / 65
+client  3  : 16 / 65
+client  3  : 17 / 65
+client  3  : 18 / 65
+client  3  : 19 / 65
+client  3  : 20 / 65
+client  3  : 21 / 65
+client  3  : 22 / 65
+client  3  : 23 / 65
+client  3  : 24 / 65
+client  3  : 25 / 65
+client  3  : 26 / 65
+[Info] Client2 心跳线程结束
+client  3  : 27 / 65
+client  3  : 28 / 65
+client  3  : 29 / 65
+client  3  : 30 / 65
+client  3  : 31 / 65
+[send_heartbeat] Client3 随机数: 0.5381643514719432
+client  3  : 32 / 65
+client  3  : 33 / 65
+client  3  : 34 / 65
+client  3  : 35 / 65
+client  3  : 36 / 65
+client  3  : 37 / 65
+client  3  : 38 / 65
+client  3  : 39 / 65
+client  3  : 40 / 65
+client  3  : 41 / 65
+client  3  : 42 / 65
+client  3  : 43 / 65
+client  3  : 44 / 65
+client  3  : 45 / 65
+client  3  : 46 / 65
+client  3  : 47 / 65
+client  3  : 48 / 65
+client  3  : 49 / 65
+client  3  : 50 / 65
+client  3  : 51 / 65
+client  3  : 52 / 65
+client  3  : 53 / 65
+client  3  : 54 / 65
+client  3  : 55 / 65
+client  3  : 56 / 65
+client  3  : 57 / 65
+client  3  : 58 / 65
+client  3  : 59 / 65
+client  3  : 60 / 65
+client  3  : 61 / 65
+client  3  : 62 / 65
+client  3  : 63 / 65
+client  3  : 64 / 65
+ Client3 Train => Local Epoch: 4        Acc: 30.084     Loss: 2.7377
+[Debug] idx_collect: [np.int64(2), np.int64(3)]
+[Debug] idx_disconnected: [np.int64(1), np.int64(0)]
+[train_server] acc_train_collect appended once, current length: 4
+[train_server] current idx_collect: [np.int64(2), np.int64(3)]
+[train_server] current idx_disconnected: [np.int64(1), np.int64(0)]
+client  3  : 65 / 65
+[send_heartbeat] Client3 随机数: 0.5381643514719432
+Client3 Test =>                         Acc: 25.098     Loss: 5.2789
+[evaluate_server] acc_test_collect appended once, current length: 4
+====================== SERVER V1==========================
+ Train: Round   3, Avg Accuracy 30.084 | Avg Loss 2.738
+ Test: Round   3, Avg Accuracy 26.585 | Avg Loss 32.042
+==========================================================
+------------------------------------------------------------
+------ Fed Server: Federation process at Client-Side -------
+------------------------------------------------------------
+====================== PipeSFL V1 ========================
+========== Train: Round   3 Time: 43.316221s ===============
+==========================================================
+[Reconnect] Client0 重新连接倒计时: 1
+[Reconnect] Client1 将在下一轮重新连接
+[Debug] len(acc_test_collect): 4
+==========================================================
+[sort idxs_users] sort idxs_users
+[Round 4] Sorted idxs_users: [np.int64(0), np.int64(3), np.int64(1), np.int64(2)]
+[Round 4] Current user's idx: 0
+[Skip] Client0 断开，跳过训练
+ Client0 断开连接，使用RL动态校正变量
+[RL Decision] Client0 修正率α = 0.5810
+[RL Feedback] Client0 奖励 = 6.8076
+[Round 4] Current user's idx: 3
+[send_heartbeat] Client3 随机数: 0.625095466604667
+client  3  : 1 / 65
+client  3  : 2 / 65
+client  3  : 3 / 65
+client  3  : 4 / 65
+client  3  : 5 / 65
+client  3  : 6 / 65
+client  3  : 7 / 65
+client  3  : 8 / 65
+client  3  : 9 / 65
+client  3  : 10 / 65
+client  3  : 11 / 65
+client  3  : 12 / 65
+client  3  : 13 / 65
+client  3  : 14 / 65
+client  3  : 15 / 65
+client  3  : 16 / 65
+client  3  : 17 / 65
+client  3  : 18 / 65
+client  3  : 19 / 65
+client  3  : 20 / 65
+client  3  : 21 / 65
+client  3  : 22 / 65
+client  3  : 23 / 65
+client  3  : 24 / 65
+client  3  : 25 / 65
+client  3  : 26 / 65
+client  3  : 27 / 65
+[Info] Client3 心跳线程结束
+client  3  : 28 / 65
+client  3  : 29 / 65
+client  3  : 30 / 65
+client  3  : 31 / 65
+client  3  : 32 / 65
+[Info] Client0 心跳线程结束
+[send_heartbeat] Client3 随机数: 0.625095466604667
+client  3  : 33 / 65
+client  3  : 34 / 65
+client  3  : 35 / 65
+client  3  : 36 / 65
+client  3  : 37 / 65
+client  3  : 38 / 65
+client  3  : 39 / 65
+client  3  : 40 / 65
+client  3  : 41 / 65
+client  3  : 42 / 65
+client  3  : 43 / 65
+client  3  : 44 / 65
+client  3  : 45 / 65
+client  3  : 46 / 65
+client  3  : 47 / 65
+client  3  : 48 / 65
+client  3  : 49 / 65
+client  3  : 50 / 65
+client  3  : 51 / 65
+client  3  : 52 / 65
+client  3  : 53 / 65
+client  3  : 54 / 65
+client  3  : 55 / 65
+client  3  : 56 / 65
+client  3  : 57 / 65
+client  3  : 58 / 65
+client  3  : 59 / 65
+client  3  : 60 / 65
+client  3  : 61 / 65
+client  3  : 62 / 65
+client  3  : 63 / 65
+client  3  : 64 / 65
+ Client3 Train => Local Epoch: 4        Acc: 45.559     Loss: 1.4587
+[Debug] idx_collect: [np.int64(3)]
+[Debug] idx_disconnected: [np.int64(0)]
+client  3  : 65 / 65
+[send_heartbeat] Client3 随机数: 0.625095466604667
+Client3 Test =>                         Acc: 30.355     Loss: 6.1803
+[Round 4] Current user's idx: 1
+[send_heartbeat] Client1 随机数: 0.8050029237453802
+client  1  : 1 / 65
+client  1  : 2 / 65
+client  1  : 3 / 65
+client  1  : 4 / 65
+client  1  : 5 / 65
+client  1  : 6 / 65
+client  1  : 7 / 65
+client  1  : 8 / 65
+client  1  : 9 / 65
+client  1  : 10 / 65
+client  1  : 11 / 65
+client  1  : 12 / 65
+client  1  : 13 / 65
+client  1  : 14 / 65
+client  1  : 15 / 65
+client  1  : 16 / 65
+client  1  : 17 / 65
+client  1  : 18 / 65
+client  1  : 19 / 65
+client  1  : 20 / 65
+client  1  : 21 / 65
+client  1  : 22 / 65
+client  1  : 23 / 65
+client  1  : 24 / 65
+client  1  : 25 / 65
+client  1  : 26 / 65
+client  1  : 27 / 65
+client  1  : 28 / 65
+client  1  : 29 / 65
+[Info] Client3 心跳线程结束
+client  1  : 30 / 65
+client  1  : 31 / 65
+client  1  : 32 / 65
+client  1  : 33 / 65
+[send_heartbeat] Client1 随机数: 0.8050029237453802
+client  1  : 34 / 65
+client  1  : 35 / 65
+client  1  : 36 / 65
+client  1  : 37 / 65
+client  1  : 38 / 65
+client  1  : 39 / 65
+client  1  : 40 / 65
+client  1  : 41 / 65
+client  1  : 42 / 65
+client  1  : 43 / 65
+client  1  : 44 / 65
+client  1  : 45 / 65
+client  1  : 46 / 65
+client  1  : 47 / 65
+client  1  : 48 / 65
+client  1  : 49 / 65
+client  1  : 50 / 65
+client  1  : 51 / 65
+client  1  : 52 / 65
+client  1  : 53 / 65
+client  1  : 54 / 65
+client  1  : 55 / 65
+client  1  : 56 / 65
+client  1  : 57 / 65
+client  1  : 58 / 65
+client  1  : 59 / 65
+client  1  : 60 / 65
+client  1  : 61 / 65
+client  1  : 62 / 65
+client  1  : 63 / 65
+client  1  : 64 / 65
+ Client1 Train => Local Epoch: 4        Acc: 59.460     Loss: 1.2653
+[Debug] idx_collect: [np.int64(3), np.int64(1)]
+[Debug] idx_disconnected: [np.int64(0)]
+client  1  : 65 / 65
+[send_heartbeat] Client1 随机数: 0.8050029237453802
+Client1 Test =>                         Acc: 35.044     Loss: 22.9344
+[Round 4] Current user's idx: 2
+[send_heartbeat] Client2 随机数: 0.5381643514719432
+client  2  : 1 / 65
+client  2  : 2 / 65
+client  2  : 3 / 65
+client  2  : 4 / 65
+client  2  : 5 / 65
+client  2  : 6 / 65
+client  2  : 7 / 65
+client  2  : 8 / 65
+client  2  : 9 / 65
+client  2  : 10 / 65
+client  2  : 11 / 65
+client  2  : 12 / 65
+client  2  : 13 / 65
+client  2  : 14 / 65
+client  2  : 15 / 65
+client  2  : 16 / 65
+client  2  : 17 / 65
+client  2  : 18 / 65
+client  2  : 19 / 65
+client  2  : 20 / 65
+client  2  : 21 / 65
+client  2  : 22 / 65
+client  2  : 23 / 65
+client  2  : 24 / 65
+client  2  : 25 / 65
+client  2  : 26 / 65
+client  2  : 27 / 65
+client  2  : 28 / 65
+client  2  : 29 / 65
+client  2  : 30 / 65
+[Info] Client1 心跳线程结束
+client  2  : 31 / 65
+client  2  : 32 / 65
+client  2  : 33 / 65
+[send_heartbeat] Client2 随机数: 0.5381643514719432
+client  2  : 34 / 65
+client  2  : 35 / 65
+client  2  : 36 / 65
+client  2  : 37 / 65
+client  2  : 38 / 65
+client  2  : 39 / 65
+client  2  : 40 / 65
+client  2  : 41 / 65
+client  2  : 42 / 65
+client  2  : 43 / 65
+client  2  : 44 / 65
+client  2  : 45 / 65
+client  2  : 46 / 65
+client  2  : 47 / 65
+client  2  : 48 / 65
+client  2  : 49 / 65
+client  2  : 50 / 65
+client  2  : 51 / 65
+client  2  : 52 / 65
+client  2  : 53 / 65
+client  2  : 54 / 65
+client  2  : 55 / 65
+client  2  : 56 / 65
+client  2  : 57 / 65
+client  2  : 58 / 65
+client  2  : 59 / 65
+client  2  : 60 / 65
+client  2  : 61 / 65
+client  2  : 62 / 65
+client  2  : 63 / 65
+client  2  : 64 / 65
+ Client2 Train => Local Epoch: 4        Acc: 48.382     Loss: 1.5809
+[Debug] idx_collect: [np.int64(3), np.int64(1), np.int64(2)]
+[Debug] idx_disconnected: [np.int64(0)]
+[train_server] acc_train_collect appended once, current length: 5
+[train_server] current idx_collect: [np.int64(3), np.int64(1), np.int64(2)]
+[train_server] current idx_disconnected: [np.int64(0)]
+client  2  : 65 / 65
+[send_heartbeat] Client2 随机数: 0.5381643514719432
+Client2 Test =>                         Acc: 32.801     Loss: 6.6116
+[evaluate_server] acc_test_collect appended once, current length: 5
+====================== SERVER V1==========================
+ Train: Round   4, Avg Accuracy 48.382 | Avg Loss 1.581
+ Test: Round   4, Avg Accuracy 32.733 | Avg Loss 11.909
+==========================================================
+------------------------------------------------------------
+------ Fed Server: Federation process at Client-Side -------
+------------------------------------------------------------
+====================== PipeSFL V1 ========================
+========== Train: Round   4 Time: 63.505871s ===============
+==========================================================
+[Reconnect] Client0 将在下一轮重新连接
+[Debug] len(acc_test_collect): 5
+==========================================================
+[Round 5] Current user's idx: 0
+[send_heartbeat] Client0 随机数: 0.8050029237453802
+client  0  : 1 / 65
+client  0  : 2 / 65
+client  0  : 3 / 65
+client  0  : 4 / 65
+client  0  : 5 / 65
+client  0  : 6 / 65
+client  0  : 7 / 65
+client  0  : 8 / 65
+client  0  : 9 / 65
+client  0  : 10 / 65
+client  0  : 11 / 65
+client  0  : 12 / 65
+client  0  : 13 / 65
+client  0  : 14 / 65
+client  0  : 15 / 65
+client  0  : 16 / 65
+client  0  : 17 / 65
+client  0  : 18 / 65
+client  0  : 19 / 65
+client  0  : 20 / 65
+client  0  : 21 / 65
+client  0  : 22 / 65
+client  0  : 23 / 65
+client  0  : 24 / 65
+client  0  : 25 / 65
+client  0  : 26 / 65
+client  0  : 27 / 65
+client  0  : 28 / 65
+[Info] Client2 心跳线程结束
+client  0  : 29 / 65
+client  0  : 30 / 65
+client  0  : 31 / 65
+client  0  : 32 / 65
+[send_heartbeat] Client0 随机数: 0.8050029237453802
+client  0  : 33 / 65
+client  0  : 34 / 65
+client  0  : 35 / 65
+client  0  : 36 / 65
+client  0  : 37 / 65
+client  0  : 38 / 65
+client  0  : 39 / 65
+client  0  : 40 / 65
+client  0  : 41 / 65
+client  0  : 42 / 65
+client  0  : 43 / 65
+client  0  : 44 / 65
+client  0  : 45 / 65
+client  0  : 46 / 65
+client  0  : 47 / 65
+client  0  : 48 / 65
+client  0  : 49 / 65
+client  0  : 50 / 65
+client  0  : 51 / 65
+client  0  : 52 / 65
+client  0  : 53 / 65
+client  0  : 54 / 65
+client  0  : 55 / 65
+client  0  : 56 / 65
+client  0  : 57 / 65
+client  0  : 58 / 65
+client  0  : 59 / 65
+client  0  : 60 / 65
+client  0  : 61 / 65
+client  0  : 62 / 65
+client  0  : 63 / 65
+client  0  : 64 / 65
+ Client0 Train => Local Epoch: 4        Acc: 54.809     Loss: 1.1872
+[Debug] idx_collect: [np.int64(0)]
+[Debug] idx_disconnected: []
+client  0  : 65 / 65
+[send_heartbeat] Client0 随机数: 0.8050029237453802
+Client0 Test =>                         Acc: 31.166     Loss: 36.1226
+[Round 5] Current user's idx: 1
+[send_heartbeat] Client1 随机数: 0.5381643514719432
+client  1  : 1 / 65
+client  1  : 2 / 65
+client  1  : 3 / 65
+client  1  : 4 / 65
+client  1  : 5 / 65
+client  1  : 6 / 65
+client  1  : 7 / 65
+client  1  : 8 / 65
+client  1  : 9 / 65
+client  1  : 10 / 65
+client  1  : 11 / 65
+client  1  : 12 / 65
+client  1  : 13 / 65
+client  1  : 14 / 65
+client  1  : 15 / 65
+client  1  : 16 / 65
+client  1  : 17 / 65
+client  1  : 18 / 65
+client  1  : 19 / 65
+client  1  : 20 / 65
+client  1  : 21 / 65
+client  1  : 22 / 65
+client  1  : 23 / 65
+client  1  : 24 / 65
+client  1  : 25 / 65
+client  1  : 26 / 65
+client  1  : 27 / 65
+client  1  : 28 / 65
+client  1  : 29 / 65
+[Info] Client0 心跳线程结束
+client  1  : 30 / 65
+client  1  : 31 / 65
+[send_heartbeat] Client1 随机数: 0.5381643514719432
+client  1  : 32 / 65
+client  1  : 33 / 65
+client  1  : 34 / 65
+client  1  : 35 / 65
+client  1  : 36 / 65
+client  1  : 37 / 65
+client  1  : 38 / 65
+client  1  : 39 / 65
+client  1  : 40 / 65
+client  1  : 41 / 65
+client  1  : 42 / 65
+client  1  : 43 / 65
+client  1  : 44 / 65
+client  1  : 45 / 65
+client  1  : 46 / 65
+client  1  : 47 / 65
+client  1  : 48 / 65
+client  1  : 49 / 65
+client  1  : 50 / 65
+client  1  : 51 / 65
+client  1  : 52 / 65
+client  1  : 53 / 65
+client  1  : 54 / 65
+client  1  : 55 / 65
+client  1  : 56 / 65
+client  1  : 57 / 65
+client  1  : 58 / 65
+client  1  : 59 / 65
+client  1  : 60 / 65
+client  1  : 61 / 65
+client  1  : 62 / 65
+client  1  : 63 / 65
+client  1  : 64 / 65
+ Client1 Train => Local Epoch: 4        Acc: 52.441     Loss: 1.4623
+[Debug] idx_collect: [np.int64(0), np.int64(1)]
+[Debug] idx_disconnected: []
+[send_heartbeat] Client1 随机数: 0.5381643514719432
+client  1  : 65 / 65
+Client1 Test =>                         Acc: 33.217     Loss: 9.2530
+[Round 5] Current user's idx: 3
+[send_heartbeat] Client3 随机数: 0.3269722766055607
+client  3  : 1 / 65
+client  3  : 2 / 65
+client  3  : 3 / 65
+client  3  : 4 / 65
+client  3  : 5 / 65
+client  3  : 6 / 65
+client  3  : 7 / 65
+client  3  : 8 / 65
+client  3  : 9 / 65
+client  3  : 10 / 65
+client  3  : 11 / 65
+client  3  : 12 / 65
+client  3  : 13 / 65
+client  3  : 14 / 65
+client  3  : 15 / 65
+client  3  : 16 / 65
+client  3  : 17 / 65
+client  3  : 18 / 65
+client  3  : 19 / 65
+client  3  : 20 / 65
+client  3  : 21 / 65
+client  3  : 22 / 65
+client  3  : 23 / 65
+client  3  : 24 / 65
+client  3  : 25 / 65
+client  3  : 26 / 65
+client  3  : 27 / 65
+client  3  : 28 / 65
+[Info] Client1 心跳线程结束
+client  3  : 29 / 65
+client  3  : 30 / 65
+client  3  : 31 / 65
+client  3  : 32 / 65
+[send_heartbeat] Client3 随机数: 0.3269722766055607
+[Random] Client3 随机数: 0.3269722766055607
+[Disconnect] Client3 断开 (概率40.0%)
+[Abort] Client3 训练期间断开，终止训练
+[Abort] Client3 训练期间断开，终止训练
+ Client3 断开连接，使用RL动态校正变量
+[RL Decision] Client3 修正率α = 0.3000
+[RL Feedback] Client3 奖励 = 162.1450
+[Round 5] Current user's idx: 2
+[send_heartbeat] Client2 随机数: 0.625095466604667
+client  2  : 1 / 65
+client  2  : 2 / 65
+client  2  : 3 / 65
+client  2  : 4 / 65
+client  2  : 5 / 65
+client  2  : 6 / 65
+client  2  : 7 / 65
+client  2  : 8 / 65
+client  2  : 9 / 65
+client  2  : 10 / 65
+client  2  : 11 / 65
+client  2  : 12 / 65
+client  2  : 13 / 65
+client  2  : 14 / 65
+client  2  : 15 / 65
+client  2  : 16 / 65
+client  2  : 17 / 65
+client  2  : 18 / 65
+client  2  : 19 / 65
+client  2  : 20 / 65
+client  2  : 21 / 65
+client  2  : 22 / 65
+client  2  : 23 / 65
+client  2  : 24 / 65
+client  2  : 25 / 65
+client  2  : 26 / 65
+client  2  : 27 / 65
+client  2  : 28 / 65
+client  2  : 29 / 65
+client  2  : 30 / 65
+[Info] Client3 心跳线程结束
+client  2  : 31 / 65
+[send_heartbeat] Client2 随机数: 0.625095466604667
+client  2  : 32 / 65
+client  2  : 33 / 65
+client  2  : 34 / 65
+client  2  : 35 / 65
+client  2  : 36 / 65
+client  2  : 37 / 65
+client  2  : 38 / 65
+client  2  : 39 / 65
+client  2  : 40 / 65
+client  2  : 41 / 65
+client  2  : 42 / 65
+client  2  : 43 / 65
+client  2  : 44 / 65
+client  2  : 45 / 65
+client  2  : 46 / 65
+client  2  : 47 / 65
+client  2  : 48 / 65
+client  2  : 49 / 65
+client  2  : 50 / 65
+client  2  : 51 / 65
+client  2  : 52 / 65
+client  2  : 53 / 65
+client  2  : 54 / 65
+client  2  : 55 / 65
+client  2  : 56 / 65
+client  2  : 57 / 65
+client  2  : 58 / 65
+client  2  : 59 / 65
+client  2  : 60 / 65
+client  2  : 61 / 65
+client  2  : 62 / 65
+client  2  : 63 / 65
+client  2  : 64 / 65
+[send_heartbeat] Client2 随机数: 0.625095466604667
+ Client2 Train => Local Epoch: 4        Acc: 56.444     Loss: 1.4596
+[Debug] idx_collect: [np.int64(0), np.int64(1), np.int64(2)]
+[Debug] idx_disconnected: [np.int64(3)]
+[train_server] acc_train_collect appended once, current length: 6
+[train_server] current idx_collect: [np.int64(0), np.int64(1), np.int64(2)]
+[train_server] current idx_disconnected: [np.int64(3)]
+client  2  : 65 / 65
+Client2 Test =>                         Acc: 36.166     Loss: 10.5889
+[evaluate_server] acc_test_collect appended once, current length: 6
+====================== SERVER V1==========================
+ Train: Round   5, Avg Accuracy 56.444 | Avg Loss 1.460
+ Test: Round   5, Avg Accuracy 33.516 | Avg Loss 18.655
+==========================================================
+------------------------------------------------------------
+------ Fed Server: Federation process at Client-Side -------
+------------------------------------------------------------
+====================== PipeSFL V1 ========================
+========== Train: Round   5 Time: 73.883155s ===============
+==========================================================
+[Reconnect] Client3 重新连接倒计时: 2
+[Debug] len(acc_test_collect): 6
+==========================================================
+[sort idxs_users] sort idxs_users
+[Round 6] Sorted idxs_users: [np.int64(3), np.int64(0), np.int64(1), np.int64(2)]
+[Round 6] Current user's idx: 3
+[Skip] Client3 断开，跳过训练
+ Client3 断开连接，使用RL动态校正变量
+[RL Decision] Client3 修正率α = 0.3000
+[RL Feedback] Client3 奖励 = 7.8346
+[Round 6] Current user's idx: 0
+[send_heartbeat] Client0 随机数: 0.5381643514719432
+client  0  : 1 / 65
+client  0  : 2 / 65
+client  0  : 3 / 65
+client  0  : 4 / 65
+client  0  : 5 / 65
+client  0  : 6 / 65
+client  0  : 7 / 65
+client  0  : 8 / 65
+client  0  : 9 / 65
+client  0  : 10 / 65
+client  0  : 11 / 65
+client  0  : 12 / 65
+client  0  : 13 / 65
+client  0  : 14 / 65
+client  0  : 15 / 65
+client  0  : 16 / 65
+client  0  : 17 / 65
+client  0  : 18 / 65
+client  0  : 19 / 65
+client  0  : 20 / 65
+client  0  : 21 / 65
+client  0  : 22 / 65
+client  0  : 23 / 65
+client  0  : 24 / 65
+client  0  : 25 / 65
+client  0  : 26 / 65
+client  0  : 27 / 65
+client  0  : 28 / 65
+client  0  : 29 / 65
+[Info] Client2 心跳线程结束
+client  0  : 30 / 65
+client  0  : 31 / 65
+client  0  : 32 / 65
+client  0  : 33 / 65
+[Info] Client3 心跳线程结束
+[send_heartbeat] Client0 随机数: 0.5381643514719432
+client  0  : 34 / 65
+client  0  : 35 / 65
+client  0  : 36 / 65
+client  0  : 37 / 65
+client  0  : 38 / 65
+client  0  : 39 / 65
+client  0  : 40 / 65
+client  0  : 41 / 65
+client  0  : 42 / 65
+client  0  : 43 / 65
+client  0  : 44 / 65
+client  0  : 45 / 65
+client  0  : 46 / 65
+client  0  : 47 / 65
+client  0  : 48 / 65
+client  0  : 49 / 65
+client  0  : 50 / 65
+client  0  : 51 / 65
+client  0  : 52 / 65
+client  0  : 53 / 65
+client  0  : 54 / 65
+client  0  : 55 / 65
+client  0  : 56 / 65
+client  0  : 57 / 65
+client  0  : 58 / 65
+client  0  : 59 / 65
+client  0  : 60 / 65
+client  0  : 61 / 65
+client  0  : 62 / 65
+client  0  : 63 / 65
+client  0  : 64 / 65
+ Client0 Train => Local Epoch: 4        Acc: 66.195     Loss: 0.8705
+[Debug] idx_collect: [np.int64(0)]
+[Debug] idx_disconnected: [np.int64(3)]
+client  0  : 65 / 65
+[send_heartbeat] Client0 随机数: 0.5381643514719432
+Client0 Test =>                         Acc: 34.300     Loss: 8.3647
+[Round 6] Current user's idx: 1
+[send_heartbeat] Client1 随机数: 0.625095466604667
+client  1  : 1 / 65
+client  1  : 2 / 65
+client  1  : 3 / 65
+client  1  : 4 / 65
+client  1  : 5 / 65
+client  1  : 6 / 65
+client  1  : 7 / 65
+client  1  : 8 / 65
+client  1  : 9 / 65
+client  1  : 10 / 65
+client  1  : 11 / 65
+client  1  : 12 / 65
+client  1  : 13 / 65
+client  1  : 14 / 65
+client  1  : 15 / 65
+client  1  : 16 / 65
+client  1  : 17 / 65
+client  1  : 18 / 65
+client  1  : 19 / 65
+client  1  : 20 / 65
+client  1  : 21 / 65
+client  1  : 22 / 65
+client  1  : 23 / 65
+client  1  : 24 / 65
+client  1  : 25 / 65
+client  1  : 26 / 65
+client  1  : 27 / 65
+client  1  : 28 / 65
+client  1  : 29 / 65
+client  1  : 30 / 65
+client  1  : 31 / 65
+client  1  : 32 / 65
+client  1  : 33 / 65
+client  1  : 34 / 65
+[Info] Client0 心跳线程结束
+client  1  : 35 / 65
+[send_heartbeat] Client1 随机数: 0.625095466604667
+client  1  : 36 / 65
+client  1  : 37 / 65
+client  1  : 38 / 65
+client  1  : 39 / 65
+client  1  : 40 / 65
+client  1  : 41 / 65
+client  1  : 42 / 65
+client  1  : 43 / 65
+client  1  : 44 / 65
+client  1  : 45 / 65
+client  1  : 46 / 65
+client  1  : 47 / 65
+client  1  : 48 / 65
+client  1  : 49 / 65
+client  1  : 50 / 65
+client  1  : 51 / 65
+client  1  : 52 / 65
+client  1  : 53 / 65
+client  1  : 54 / 65
+client  1  : 55 / 65
+client  1  : 56 / 65
+client  1  : 57 / 65
+client  1  : 58 / 65
+client  1  : 59 / 65
+client  1  : 60 / 65
+client  1  : 61 / 65
+client  1  : 62 / 65
+client  1  : 63 / 65
+client  1  : 64 / 65
+ Client1 Train => Local Epoch: 4        Acc: 59.191     Loss: 1.7474
+[Debug] idx_collect: [np.int64(0), np.int64(1)]
+[Debug] idx_disconnected: [np.int64(3)]
+client  1  : 65 / 65
+Client1 Test =>                         Acc: 38.515     Loss: 10.3579
+[Round 6] Current user's idx: 2
+[send_heartbeat] Client2 随机数: 0.3269722766055607
+client  2  : 1 / 65
+client  2  : 2 / 65
+client  2  : 3 / 65
+[Info] Client1 心跳线程结束
+client  2  : 4 / 65
+client  2  : 5 / 65
+client  2  : 6 / 65
+client  2  : 7 / 65
+client  2  : 8 / 65
+client  2  : 9 / 65
+client  2  : 10 / 65
+client  2  : 11 / 65
+client  2  : 12 / 65
+client  2  : 13 / 65
+client  2  : 14 / 65
+client  2  : 15 / 65
+client  2  : 16 / 65
+client  2  : 17 / 65
+client  2  : 18 / 65
+client  2  : 19 / 65
+client  2  : 20 / 65
+client  2  : 21 / 65
+client  2  : 22 / 65
+client  2  : 23 / 65
+client  2  : 24 / 65
+client  2  : 25 / 65
+client  2  : 26 / 65
+client  2  : 27 / 65
+client  2  : 28 / 65
+client  2  : 29 / 65
+client  2  : 30 / 65
+client  2  : 31 / 65
+client  2  : 32 / 65
+client  2  : 33 / 65
+client  2  : 34 / 65
+[send_heartbeat] Client2 随机数: 0.3269722766055607
+[Random] Client2 随机数: 0.3269722766055607
+[Disconnect] Client2 断开 (概率40.0%)
+[Abort] Client2 训练期间断开，终止训练
+[update_fed_check] acc_train_collect appended once, current length: 7
+[update_fed_check] current idx_collect: [np.int64(0), np.int64(1)]
+[update_fed_check] current idx_disconnected: [np.int64(3), np.int64(2)]
+[update_fed_check] acc_test_collect appended once, current length: 7
+[Abort] Client2 训练期间断开，终止训练
+ Client2 断开连接，使用RL动态校正变量
+[RL Decision] Client2 修正率α = 0.5937
+[RL Feedback] Client2 奖励 = 0.0000
+------------------------------------------------------------
+------ Fed Server: Federation process at Client-Side -------
+------------------------------------------------------------
+====================== PipeSFL V1 ========================
+========== Train: Round   6 Time: 49.664956s ===============
+==========================================================
+[Reconnect] Client2 重新连接倒计时: 2
+[Reconnect] Client3 重新连接倒计时: 1
+[Debug] len(acc_test_collect): 7
+==========================================================
+[sort idxs_users] sort idxs_users
+[Round 7] Sorted idxs_users: [np.int64(3), np.int64(2), np.int64(0), np.int64(1)]
+[Round 7] Current user's idx: 3
+[Skip] Client3 断开，跳过训练
+ Client3 断开连接，使用RL动态校正变量
+[RL Decision] Client3 修正率α = 0.3669
+[RL Feedback] Client3 奖励 = 0.0000
+[Round 7] Current user's idx: 2
+[Skip] Client2 断开，跳过训练
+ Client2 断开连接，使用RL动态校正变量
+[RL Decision] Client2 修正率α = 0.3332
+[RL Feedback] Client2 奖励 = 0.0000
+[Round 7] Current user's idx: 0
+[send_heartbeat] Client0 随机数: 0.625095466604667
+client  0  : 1 / 65
+client  0  : 2 / 65
+client  0  : 3 / 65
+client  0  : 4 / 65
+client  0  : 5 / 65
+client  0  : 6 / 65
+client  0  : 7 / 65
+client  0  : 8 / 65
+client  0  : 9 / 65
+client  0  : 10 / 65
+client  0  : 11 / 65
+client  0  : 12 / 65
+client  0  : 13 / 65
+client  0  : 14 / 65
+client  0  : 15 / 65
+client  0  : 16 / 65
+client  0  : 17 / 65
+client  0  : 18 / 65
+client  0  : 19 / 65
+client  0  : 20 / 65
+client  0  : 21 / 65
+client  0  : 22 / 65
+client  0  : 23 / 65
+client  0  : 24 / 65
+client  0  : 25 / 65
+client  0  : 26 / 65
+client  0  : 27 / 65
+client  0  : 28 / 65
+client  0  : 29 / 65
+client  0  : 30 / 65
+client  0  : 31 / 65
+client  0  : 32 / 65
+client  0  : 33 / 65
+[Info] Client2 心跳线程结束
+[Info] Client3 心跳线程结束
+[Info] Client2 心跳线程结束
+client  0  : 34 / 65
+[send_heartbeat] Client0 随机数: 0.625095466604667
+client  0  : 35 / 65
+client  0  : 36 / 65
+client  0  : 37 / 65
+client  0  : 38 / 65
+client  0  : 39 / 65
+client  0  : 40 / 65
+client  0  : 41 / 65
+client  0  : 42 / 65
+client  0  : 43 / 65
+client  0  : 44 / 65
+client  0  : 45 / 65
+client  0  : 46 / 65
+client  0  : 47 / 65
+client  0  : 48 / 65
+client  0  : 49 / 65
+client  0  : 50 / 65
+client  0  : 51 / 65
+client  0  : 52 / 65
+client  0  : 53 / 65
+client  0  : 54 / 65
+client  0  : 55 / 65
+client  0  : 56 / 65
+client  0  : 57 / 65
+client  0  : 58 / 65
+client  0  : 59 / 65
+client  0  : 60 / 65
+client  0  : 61 / 65
+client  0  : 62 / 65
+client  0  : 63 / 65
+client  0  : 64 / 65
+ Client0 Train => Local Epoch: 4        Acc: 69.616     Loss: 0.7970
+[Debug] idx_collect: [np.int64(0)]
+[Debug] idx_disconnected: [np.int64(3), np.int64(2)]
+client  0  : 65 / 65
+[send_heartbeat] Client0 随机数: 0.625095466604667
+Client0 Test =>                         Acc: 30.503     Loss: 19.5888
+[Round 7] Current user's idx: 1
+[send_heartbeat] Client1 随机数: 0.3269722766055607
+client  1  : 1 / 65
+client  1  : 2 / 65
+client  1  : 3 / 65
+client  1  : 4 / 65
+client  1  : 5 / 65
+client  1  : 6 / 65
+client  1  : 7 / 65
+client  1  : 8 / 65
+client  1  : 9 / 65
+client  1  : 10 / 65
+client  1  : 11 / 65
+client  1  : 12 / 65
+client  1  : 13 / 65
+client  1  : 14 / 65
+client  1  : 15 / 65
+client  1  : 16 / 65
+client  1  : 17 / 65
+client  1  : 18 / 65
+client  1  : 19 / 65
+client  1  : 20 / 65
+client  1  : 21 / 65
+client  1  : 22 / 65
+client  1  : 23 / 65
+client  1  : 24 / 65
+client  1  : 25 / 65
+client  1  : 26 / 65
+client  1  : 27 / 65
+client  1  : 28 / 65
+client  1  : 29 / 65
+client  1  : 30 / 65
+client  1  : 31 / 65
+client  1  : 32 / 65
+[Info] Client0 心跳线程结束
+client  1  : 33 / 65
+[send_heartbeat] Client1 随机数: 0.3269722766055607
+[Random] Client1 随机数: 0.3269722766055607
+[Disconnect] Client1 断开 (概率40.0%)
+[Abort] Client1 训练期间断开，终止训练
+[update_fed_check] acc_train_collect appended once, current length: 8
+[update_fed_check] current idx_collect: [np.int64(0)]
+[update_fed_check] current idx_disconnected: [np.int64(3), np.int64(2), np.int64(1)]
+[update_fed_check] acc_test_collect appended once, current length: 8
+[Abort] Client1 训练期间断开，终止训练
+ Client1 断开连接，使用RL动态校正变量
+[RL Decision] Client1 修正率α = 0.3000
+[RL Feedback] Client1 奖励 = 0.0000
+------------------------------------------------------------
+------ Fed Server: Federation process at Client-Side -------
+------------------------------------------------------------
+====================== PipeSFL V1 ========================
+========== Train: Round   7 Time: 30.756416s ===============
+==========================================================
+[Reconnect] Client1 重新连接倒计时: 2
+[Reconnect] Client2 重新连接倒计时: 1
+[Reconnect] Client3 将在下一轮重新连接
+[Debug] len(acc_test_collect): 8
+==========================================================
+[sort idxs_users] sort idxs_users
+[Round 8] Sorted idxs_users: [np.int64(2), np.int64(1), np.int64(0), np.int64(3)]
+[Round 8] Current user's idx: 2
+[Skip] Client2 断开，跳过训练
+ Client2 断开连接，使用RL动态校正变量
+[RL Decision] Client2 修正率α = 0.6047
+[RL Feedback] Client2 奖励 = 0.0000
+[Round 8] Current user's idx: 1
+[Skip] Client1 断开，跳过训练
+ Client1 断开连接，使用RL动态校正变量
+[RL Decision] Client1 修正率α = 0.3000
+[RL Feedback] Client1 奖励 = 0.0000
+[Round 8] Current user's idx: 0
+[send_heartbeat] Client0 随机数: 0.3269722766055607
+client  0  : 1 / 65
+client  0  : 2 / 65
+client  0  : 3 / 65
+client  0  : 4 / 65
+client  0  : 5 / 65
+client  0  : 6 / 65
+client  0  : 7 / 65
+client  0  : 8 / 65
+client  0  : 9 / 65
+client  0  : 10 / 65
+client  0  : 11 / 65
+client  0  : 12 / 65
+client  0  : 13 / 65
+client  0  : 14 / 65
+client  0  : 15 / 65
+client  0  : 16 / 65
+client  0  : 17 / 65
+client  0  : 18 / 65
+client  0  : 19 / 65
+client  0  : 20 / 65
+client  0  : 21 / 65
+client  0  : 22 / 65
+client  0  : 23 / 65
+client  0  : 24 / 65
+client  0  : 25 / 65
+client  0  : 26 / 65
+client  0  : 27 / 65
+client  0  : 28 / 65
+client  0  : 29 / 65
+client  0  : 30 / 65
+[Info] Client1 心跳线程结束
+client  0  : 31 / 65
+client  0  : 32 / 65
+[Info] Client2 心跳线程结束
+[Info] Client1 心跳线程结束
+[send_heartbeat] Client0 随机数: 0.3269722766055607
+[Random] Client0 随机数: 0.3269722766055607
+[Disconnect] Client0 断开 (概率40.0%)
+[Abort] Client0 训练期间断开，终止训练
+[Abort] Client0 训练期间断开，终止训练
+ Client0 断开连接，使用RL动态校正变量
+[RL Decision] Client0 修正率α = 0.3000
+[RL Feedback] Client0 奖励 = 0.0000
+[Round 8] Current user's idx: 3
+[send_heartbeat] Client3 随机数: 0.12857020276919962
+client  3  : 1 / 65
+client  3  : 2 / 65
+client  3  : 3 / 65
+client  3  : 4 / 65
+client  3  : 5 / 65
+client  3  : 6 / 65
+client  3  : 7 / 65
+client  3  : 8 / 65
+client  3  : 9 / 65
+client  3  : 10 / 65
+client  3  : 11 / 65
+client  3  : 12 / 65
+client  3  : 13 / 65
+client  3  : 14 / 65
+client  3  : 15 / 65
+client  3  : 16 / 65
+client  3  : 17 / 65
+client  3  : 18 / 65
+client  3  : 19 / 65
+client  3  : 20 / 65
+client  3  : 21 / 65
+client  3  : 22 / 65
+client  3  : 23 / 65
+client  3  : 24 / 65
+client  3  : 25 / 65
+client  3  : 26 / 65
+client  3  : 27 / 65
+client  3  : 28 / 65
+client  3  : 29 / 65
+client  3  : 30 / 65
+client  3  : 31 / 65
+[Info] Client0 心跳线程结束
+[send_heartbeat] Client3 随机数: 0.12857020276919962
+[Random] Client3 随机数: 0.12857020276919962
+[Disconnect] Client3 断开 (概率40.0%)
+[Abort] Client3 训练期间断开，终止训练
+[update_fed_check] acc_train_collect appended once, current length: 9
+[update_fed_check] current idx_collect: []
+[update_fed_check] current idx_disconnected: [np.int64(2), np.int64(1), np.int64(0), np.int64(3)]
+[update_fed_check] acc_test_collect appended once, current length: 9
+[Abort] Client3 训练期间断开，终止训练
+ Client3 断开连接，使用RL动态校正变量
+[RL Decision] Client3 修正率α = 0.3000
+[RL Feedback] Client3 奖励 = 0.0000
+------------------------------------------------------------
+------ Fed Server: Federation process at Client-Side -------
+------------------------------------------------------------
+====================== PipeSFL V1 ========================
+========== Train: Round   8 Time: 20.534529s ===============
+==========================================================
+[Reconnect] Client0 重新连接倒计时: 2
+[Reconnect] Client1 重新连接倒计时: 1
+[Reconnect] Client2 将在下一轮重新连接
+[Reconnect] Client3 重新连接倒计时: 2
+[Debug] len(acc_test_collect): 9
+==========================================================
+[sort idxs_users] sort idxs_users
+[Round 9] Sorted idxs_users: [np.int64(1), np.int64(0), np.int64(3), np.int64(2)]
+[Round 9] Current user's idx: 1
+[Skip] Client1 断开，跳过训练
+ Client1 断开连接，使用RL动态校正变量
+[RL Decision] Client1 修正率α = 0.3000
+[RL Feedback] Client1 奖励 = 0.0000
+[Round 9] Current user's idx: 0
+[Skip] Client0 断开，跳过训练
+ Client0 断开连接，使用RL动态校正变量
+[RL Decision] Client0 修正率α = 0.3000
+[RL Feedback] Client0 奖励 = 0.0000
+[Round 9] Current user's idx: 3
+[Skip] Client3 断开，跳过训练
+ Client3 断开连接，使用RL动态校正变量
+[RL Decision] Client3 修正率α = 0.3000
+[RL Feedback] Client3 奖励 = 0.0000
+[Round 9] Current user's idx: 2
+[send_heartbeat] Client2 随机数: 0.12857020276919962
+client  2  : 1 / 65
+client  2  : 2 / 65
+client  2  : 3 / 65
+client  2  : 4 / 65
+client  2  : 5 / 65
+client  2  : 6 / 65
+client  2  : 7 / 65
+client  2  : 8 / 65
+client  2  : 9 / 65
+client  2  : 10 / 65
+client  2  : 11 / 65
+client  2  : 12 / 65
+client  2  : 13 / 65
+client  2  : 14 / 65
+client  2  : 15 / 65
+client  2  : 16 / 65
+client  2  : 17 / 65
+client  2  : 18 / 65
+client  2  : 19 / 65
+client  2  : 20 / 65
+client  2  : 21 / 65
+client  2  : 22 / 65
+client  2  : 23 / 65
+client  2  : 24 / 65
+client  2  : 25 / 65
+client  2  : 26 / 65
+client  2  : 27 / 65
+client  2  : 28 / 65
+client  2  : 29 / 65
+client  2  : 30 / 65
+[Info] Client3 心跳线程结束
+client  2  : 31 / 65
+[Info] Client1 心跳线程结束
+[Info] Client0 心跳线程结束
+[Info] Client3 心跳线程结束
+[send_heartbeat] Client2 随机数: 0.12857020276919962
+[Random] Client2 随机数: 0.12857020276919962
+[Disconnect] Client2 断开 (概率40.0%)
+[Abort] Client2 训练期间断开，终止训练
+[update_fed_check] acc_train_collect appended once, current length: 10
+[update_fed_check] current idx_collect: []
+[update_fed_check] current idx_disconnected: [np.int64(1), np.int64(0), np.int64(3), np.int64(2)]
+[update_fed_check] acc_test_collect appended once, current length: 10
+[Abort] Client2 训练期间断开，终止训练
+ Client2 断开连接，使用RL动态校正变量
+[RL Decision] Client2 修正率α = 0.3000
+[RL Feedback] Client2 奖励 = 0.0000
+------------------------------------------------------------
+------ Fed Server: Federation process at Client-Side -------
+------------------------------------------------------------
+====================== PipeSFL V1 ========================
+========== Train: Round   9 Time: 10.429293s ===============
+==========================================================
+[Reconnect] Client0 重新连接倒计时: 1
+[Reconnect] Client1 将在下一轮重新连接
+[Reconnect] Client2 重新连接倒计时: 2
+[Reconnect] Client3 重新连接倒计时: 1
+[Debug] len(acc_test_collect): 10
+==========================================================
+[sort idxs_users] sort idxs_users
+[Round 10] Sorted idxs_users: [np.int64(3), np.int64(0), np.int64(2), np.int64(1)]
+[Round 10] Current user's idx: 3
+[Skip] Client3 断开，跳过训练
+ Client3 断开连接，使用RL动态校正变量
+[RL Decision] Client3 修正率α = 0.8074
+[RL Feedback] Client3 奖励 = 0.0000
+[Round 10] Current user's idx: 0
+[Skip] Client0 断开，跳过训练
+ Client0 断开连接，使用RL动态校正变量
+[RL Decision] Client0 修正率α = 0.3626
+[RL Feedback] Client0 奖励 = 0.0000
+[Round 10] Current user's idx: 2
+[Skip] Client2 断开，跳过训练
+ Client2 断开连接，使用RL动态校正变量
+[RL Decision] Client2 修正率α = 0.3000
+[RL Feedback] Client2 奖励 = 0.0000
+[Round 10] Current user's idx: 1
+[send_heartbeat] Client1 随机数: 0.12857020276919962
+client  1  : 1 / 65
+client  1  : 2 / 65
+client  1  : 3 / 65
+client  1  : 4 / 65
+client  1  : 5 / 65
+client  1  : 6 / 65
+client  1  : 7 / 65
+client  1  : 8 / 65
+client  1  : 9 / 65
+client  1  : 10 / 65
+client  1  : 11 / 65
+client  1  : 12 / 65
+client  1  : 13 / 65
+client  1  : 14 / 65
+client  1  : 15 / 65
+client  1  : 16 / 65
+client  1  : 17 / 65
+client  1  : 18 / 65
+client  1  : 19 / 65
+client  1  : 20 / 65
+client  1  : 21 / 65
+client  1  : 22 / 65
+client  1  : 23 / 65
+client  1  : 24 / 65
+client  1  : 25 / 65
+client  1  : 26 / 65
+client  1  : 27 / 65
+client  1  : 28 / 65
+client  1  : 29 / 65
+[Info] Client2 心跳线程结束
+client  1  : 30 / 65
+[Info] Client3 心跳线程结束
+[Info] Client0 心跳线程结束
+[Info] Client2 心跳线程结束
+[send_heartbeat] Client1 随机数: 0.12857020276919962
+[Random] Client1 随机数: 0.12857020276919962
+[Disconnect] Client1 断开 (概率40.0%)
+[Abort] Client1 训练期间断开，终止训练
+[update_fed_check] acc_train_collect appended once, current length: 11
+[update_fed_check] current idx_collect: []
+[update_fed_check] current idx_disconnected: [np.int64(0), np.int64(3), np.int64(2), np.int64(1)]
+[update_fed_check] acc_test_collect appended once, current length: 11
+[Abort] Client1 训练期间断开，终止训练
+ Client1 断开连接，使用RL动态校正变量
+[RL Decision] Client1 修正率α = 0.3058
+[RL Feedback] Client1 奖励 = 0.0000
+------------------------------------------------------------
+------ Fed Server: Federation process at Client-Side -------
+------------------------------------------------------------
+====================== PipeSFL V1 ========================
+========== Train: Round  10 Time: 10.213086s ===============
+==========================================================
+[Reconnect] Client0 将在下一轮重新连接
+[Reconnect] Client1 重新连接倒计时: 2
+[Reconnect] Client2 重新连接倒计时: 1
+[Reconnect] Client3 将在下一轮重新连接
+[Debug] len(acc_test_collect): 11
+==========================================================
+[sort idxs_users] sort idxs_users
+[Round 11] Sorted idxs_users: [np.int64(2), np.int64(1), np.int64(0), np.int64(3)]
+[Round 11] Current user's idx: 2
+[Skip] Client2 断开，跳过训练
+ Client2 断开连接，使用RL动态校正变量
+[RL Decision] Client2 修正率α = 0.3000
+[RL Feedback] Client2 奖励 = 0.0000
+[Round 11] Current user's idx: 1
+[Skip] Client1 断开，跳过训练
+ Client1 断开连接，使用RL动态校正变量
+[RL Decision] Client1 修正率α = 0.8764
+[RL Feedback] Client1 奖励 = 0.0000
+Traceback (most recent call last):
+  File "/home/xiaowen/PipeSFL_Corr/try_new/CIFAR_corr_apt_alpha.py", line 1000, in <module>
+    rl_agent.learn()
+  File "/home/xiaowen/PipeSFL_Corr/try_new/CIFAR_corr_apt_alpha.py", line 716, in learn
+    out = self.policy_net(states)
+          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/site-packages/torch/nn/modules/container.py", line 244, in forward
+    input = module(input)
+            ^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/site-packages/torch/nn/modules/linear.py", line 125, in forward
+    return F.linear(input, self.weight, self.bias)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Expected all tensors to be on the same device, but got mat1 is on cpu, different from other tensors on cuda:0 (when checking argument in method wrapper_CUDA_addmm)
+[Error] An unexpected error occurred:
+[Info] Client1 心跳线程结束
+[Info] Client2 心跳线程结束
+^CProcess Process-2:
+Exception ignored in atexit callback: <function _exit_function at 0x79fb88bebf60>
+Traceback (most recent call last):
+  File "/home/conda/lib/python3.12/multiprocessing/util.py", line 360, in _exit_function
+    p.join()
+  File "/home/conda/lib/python3.12/multiprocessing/process.py", line 149, in join
+    res = self._popen.wait(timeout)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/multiprocessing/popen_fork.py", line 43, in wait
+    return self.poll(os.WNOHANG if timeout == 0.0 else 0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/multiprocessing/popen_fork.py", line 27, in poll
+    pid, sts = os.waitpid(self.pid, flag)
+Traceback (most recent call last):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt:
+
+    conn.send((self._id, methodname, args, kwds))
+  File "/home/conda/lib/python3.12/multiprocessing/connection.py", line 206, in send
+    self._send_bytes(_ForkingPickler.dumps(obj))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/multiprocessing/reduction.py", line 51, in dumps
+    cls(buf, protocol).dump(obj)
+    ^^^^^^^^^^^^^^^^^^
+  File "/home/conda/lib/python3.12/multiprocessing/reduction.py", line 41, in __init__
+    self.dispatch_table.update(self._extra_reducers)
+KeyboardInterrupt
+(pytorch) xiaowen@user:~/PipeSFL_Corr/try_new$
+[rfl-3] 0:bash*                                                                                                                             "user" 16:45 22-10月-25
+
