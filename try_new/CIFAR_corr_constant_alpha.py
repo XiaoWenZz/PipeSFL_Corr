@@ -805,11 +805,11 @@ if __name__ == '__main__':
     running = manager.Value('b', True)
 
     parser = argparse.ArgumentParser(description='Training script with RL-based correction rate')
-    parser.add_argument('--epochs', type=int, default=10, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
     parser.add_argument('--disconnect_prob', type=float, default=0.40, help='Disconnect probability')
     parser.add_argument('--disconnect_round', type=int, default=3, help='Disconnect round')
     parser.add_argument("--local_ep", type=int, default=3, help="Local epochs")
-    parser.add_argument('--lr_decay', type=float, default=0.95, help='Learning rate decay factor')
+    parser.add_argument('--lr_decay', type=float, default=1, help='Learning rate decay factor')
     parser.add_argument("--lr", type=float, default=0.001, help='Learning rate')
     parser.add_argument("--rl_lr", type=float, default=0.001, help='RL agent learning rate')
     parser.add_argument("--correction_rate", type=float, default=None, help='Fixed correction rate (alpha) for disconnected clients; if set, disables RL and uses this value')
