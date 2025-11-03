@@ -5,12 +5,12 @@ import numpy as np
 # 根据提供的map key 为修正率cr value 为 acc 绘制图像
 map_of_corr_fmnist = {
     0.4: 0.53,
-    0.5: 0.55,
-    0.6: 0.56,
-    0.7: 0.52,
-    0.8: 0.55,
-    0.9: 0.55,
-    1.0: 0.57,
+    0.5: 0.54,
+    0.6: 0.55,
+    0.7: 0.55,
+    0.8: 0.57,
+    0.9: 0.58,
+    1.0: 0.60,
 }
 
 map_without_corr_fmnist = {
@@ -65,9 +65,9 @@ def plot_map_cifar10():
 def plot_map_fmnist():
     plt.figure(figsize=(10, 6))
     plt.plot(list(map_of_corr_fmnist.keys()), list(map_of_corr_fmnist.values()),
-             label='With Correction', marker='o')
+             label='Corr', marker='o')
     plt.plot(list(map_without_corr_fmnist.keys()), list(map_without_corr_fmnist.values()),
-             label='Without Correction', marker='o')
+             label='No Corr', marker='o')
     plt.title('Correction Rate vs Accuracy on FMNIST', fontsize=16)
     plt.xlabel('Correction Rate (cr)', fontsize=14)
     plt.ylabel('Accuracy', fontsize=14)

@@ -162,11 +162,14 @@ def calculate_accuracy(fx, y):
     return acc
 
 
-def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_server, lr, criterion,
+def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, lr, criterion,
                  batch_acc_train, batch_loss_train, count1, loss_train_collect_user, acc_train_collect_user,
                  idx_collect, idx_disconnected, idx_round_disconnected,
                  num_users):
-    global l_epoch_check, fed_check
+    """Train the global server model on the received activations and return gradients to client.
+    This uses the single shared global `net_glob_server` (in-place update), matching v2 behavior.
+    """
+    global l_epoch_check, fed_check, net_glob_server
     net_glob_server = net_glob_server.to('cuda:0')
     net_glob_server.train()
     optimizer_server = torch.optim.Adam(net_glob_server.parameters(), lr=lr)
@@ -183,7 +186,7 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
     if torch.isnan(fx_client.grad).any():
         print(f"[Error] Server 梯度包含NaN，Client {idx} 的参数将被标记为无效")
         idx_round_disconnected.append(idx)
-        return None, net_glob_server
+        return None
     dfx_client = fx_client.grad.clone().detach()
     optimizer_server.step()
 
@@ -216,9 +219,6 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
                 else:
                     idx_collect.append(idx)
 
-        print(f"[Debug] idx_collect: {idx_collect}")
-        print(f"[Debug] idx_disconnected: {idx_disconnected}")
-
         if len(idx_collect) + len(idx_round_disconnected) == num_users:
             fed_check = True
             if len(acc_train_collect_user) > 0:
@@ -236,12 +236,9 @@ def train_server(fx_client, y, l_epoch_count, l_epoch, idx, len_batch, net_glob_
             acc_avg_all_user_train_global = acc_avg_all_user_train
             loss_avg_all_user_train_global = loss_avg_all_user_train
             acc_train_collect.append(acc_avg_all_user_train)
-            print('[train_server] acc_train_collect appended once, current length:', len(acc_train_collect))
-            print('[train_server] current idx_collect:', idx_collect)
-            print('[train_server] current idx_disconnected:', idx_disconnected)
             loss_train_collect.append(loss_avg_all_user_train)
 
-    return dfx_client, net_glob_server
+    return dfx_client
 
 
 def evaluate_server(fx_client, y, idx, len_batch, ell):
@@ -463,8 +460,7 @@ class Client(object):
                                 print(f"[Warning] Client{self.idx} 在 idx_collect 中，可能存在竞态条件")
                             else:
                                 idx_disconnected.append(self.idx)
-                        if fed_check == False and len(self.idx_collect) + len(
-                                self.idx_disconnected) == self.num_users:
+                        if fed_check == False and len(self.idx_collect) + len(self.idx_disconnected) == self.num_users:
                             self.update_fed_check()
                         break
                     len_batch = len(self.ldr_train)
@@ -477,8 +473,7 @@ class Client(object):
                                     print(f"[Warning] Client{self.idx} 在 idx_collect 中，可能存在竞态条件")
                                 else:
                                     idx_disconnected.append(self.idx)
-                            if fed_check == False and len(self.idx_collect) + len(
-                                    self.idx_disconnected) == self.num_users:
+                            if fed_check == False and len(self.idx_collect) + len(self.idx_disconnected) == self.num_users:
                                 self.update_fed_check()
                             break
 
@@ -492,14 +487,13 @@ class Client(object):
                         self.count1 = self.count1 + 1
 
                         print('client ', self.idx, ' :', self.count1, '/', len_batch * self.local_ep)
-                        dfx, net_glob_server = train_server(client_fx, labels, iter, self.local_ep, self.idx,
-                                                            len_batch, self.net_glob_server,
-                                                            self.lr, self.criterion, self.batch_acc_train,
-                                                            self.batch_loss_train, self.count1,
-                                                            self.loss_train_collect_user,
-                                                            self.acc_train_collect_user, self.idx_collect,
-                                                            self.idx_disconnected, self.idx_round_disconnected,
-                                                            self.num_users)
+                        dfx = train_server(client_fx, labels, iter, self.local_ep, self.idx,
+                                            len_batch, self.lr, self.criterion, self.batch_acc_train,
+                                            self.batch_loss_train, self.count1,
+                                            self.loss_train_collect_user,
+                                            self.acc_train_collect_user, self.idx_collect,
+                                            self.idx_disconnected, self.idx_round_disconnected,
+                                            self.num_users)
 
                         fx.backward(dfx)
                         for param in net.parameters():
@@ -507,13 +501,15 @@ class Client(object):
                         optimizer_client.step()
 
                 net.to('cpu')
+                # global server lives in module scope; move to cpu for safety
                 net_glob_server.to('cpu')
 
                 for param in net.parameters():
                     if torch.isnan(param).any():
                         print(f"[Error] Client{self.idx} 模型参数包含 NaN")
 
-                return net.cpu().state_dict(), self.net_glob_server.cpu().state_dict()
+                # Return only client model weights; server is updated in-place globally
+                return net.cpu().state_dict(),
             finally:
                 self.status = "idle"
 
@@ -603,6 +599,54 @@ def dataset_non_iid(dataset, num_users, class_distribution):
                     used_indices[cls].extend(available_indices)
 
     return dict_users
+
+
+def cifar_user_dataset(dataset, num_users, noniid_fraction):
+    """
+    Create a split similar to v2_cifar10.py: a fraction of the dataset is non-iid (sharded by label)
+    and the rest is IID across users.
+    noniid_fraction is a value in [0,1] indicating portion of samples assigned in a non-iid way.
+    """
+    # initialization
+    total_items = len(dataset)
+    num_noniid_items = int(total_items * noniid_fraction)
+    num_iid_items = total_items - num_noniid_items
+    dict_users = [list() for _ in range(num_users)]
+    idxs = [i for i in range(len(dataset))]
+
+    # IID portion
+    if num_iid_items != 0:
+        per_user_iid_items = int(num_iid_items / num_users)
+        for ii in range(num_users):
+            tmp_set = set(np.random.choice(idxs, per_user_iid_items, replace=False))
+            dict_users[ii] += list(tmp_set)
+            idxs = list(set(idxs) - tmp_set)
+
+    # NON-IID portion: shard by label and assign shards to users
+    if num_noniid_items != 0:
+        num_shards = num_users
+        per_shards_num_imgs = int(num_noniid_items / num_shards)
+        # collect labels for remaining idxs
+        labels = [dataset[i][1] for i in idxs]
+        idxs = np.array(idxs)
+        labels = np.array(labels)
+        # sort by label
+        order = labels.argsort()
+        idxs = idxs[order]
+
+        idx_shard = [i for i in range(num_shards)]
+        i = 0
+        while idx_shard:
+            rand_idx = np.random.choice(idx_shard, 1, replace=False)[0]
+            idx_shard = list(set(idx_shard) - {rand_idx})
+            start = int(rand_idx) * per_shards_num_imgs
+            end = (int(rand_idx) + 1) * per_shards_num_imgs
+            selected = list(idxs[start:end])
+            dict_users[i].extend(selected)
+            i = (i + 1) % num_users
+
+    # convert to dict of sets to match other utilities
+    return {i: set(dict_users[i]) for i in range(num_users)}
 
 
 def monitor_heartbeats(heartbeat_queue, num_users):
@@ -802,7 +846,6 @@ if __name__ == '__main__':
 
     # 初始化上一轮的全局模型参数
     prev_w_glob_client = {k: v.cpu() for k, v in copy.deepcopy(net_glob_client.state_dict()).items()}
-    prev_w_glob_server = {k: v.cpu() for k, v in copy.deepcopy(net_glob_server.state_dict()).items()}
 
     # 服务端损失和准确率收集
     loss_train_collect = manager.list()
@@ -833,10 +876,8 @@ if __name__ == '__main__':
     monitor_process = multiprocessing.Process(target=monitor_heartbeats, args=(heartbeat_queue, num_users))
     monitor_process.start()
 
-    # 初始化校正变量
+    # 初始化校正变量 (server corrections removed in global-server mode)
     client_corrections = {i: {k: torch.zeros_like(v) for k, v in net_glob_client.state_dict().items()} for i in
-                          range(num_users)}
-    server_corrections = {i: {k: torch.zeros_like(v) for k, v in net_glob_server.state_dict().items()} for i in
                           range(num_users)}
 
     # =============================================================================
@@ -872,14 +913,8 @@ if __name__ == '__main__':
         transform=test_transforms
     )
 
-    # 数据集划分
-    class_distribution = [
-        [1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-        [1, 1, 1, 0, 0, 1, 1, 0, 0, 0],
-        [0, 0, 0, 1, 1, 0, 0, 1, 1, 1]
-    ]
-    dict_users = dataset_non_iid(dataset_train, num_users, class_distribution)
+    # 数据集划分: use cifar_user_dataset non-iid split similar to v2_cifar10.py
+    dict_users = cifar_user_dataset(dataset_train, num_users, noniid_fraction=0.1)
     dict_users_test = dataset_iid(dataset_test, num_users)
     draw_data_distribution(dict_users, dataset_train, num_users,
                            save_path='output/data_distribution.png')
@@ -900,7 +935,6 @@ if __name__ == '__main__':
         m = max(int(frac * num_users), 1)
         idxs_users = np.random.choice(range(num_users), m, replace=False)
         w_locals_client = []
-        w_glob_server_buffer = []
 
         global_seed = iter
         numpy.random.seed(global_seed)
@@ -936,55 +970,46 @@ if __name__ == '__main__':
                                disconnect_round=disconnect_round, local_ep=local_ep)
 
             # 训练
-            w_client, w_glob_server = local.train(net=copy.deepcopy(net_glob_client))
+            client_ret = local.train(net=copy.deepcopy(net_glob_client))
+            if client_ret is None:
+                w_client = None
+            else:
+                w_client = client_ret[0]
 
             if local.is_disconnected:
                 prRed(f"Client{idx} 断开连接，使用RL动态校正变量")
 
                 # 1. 获取当前状态
                 offline_time = idx_disconnected_time[idx]
-                # 处理acc_test_collect为空的情况
                 if len(acc_test_collect) >= 1:
                     current_acc = acc_test_collect[-1]
-                    prev_acc = acc_test_collect[-2] if len(acc_test_collect) >= 2 else current_acc  # 若只有1个元素，用自身作为前值
+                    prev_acc = acc_test_collect[-2] if len(acc_test_collect) >= 2 else current_acc
                 else:
                     current_acc = 0.0
                     prev_acc = 0.0
                 acc_change = current_acc - prev_acc
 
-                # 处理loss_test_collect为空的情况
                 if len(loss_test_collect) >= 1:
                     current_loss = loss_test_collect[-1]
-                    prev_loss = loss_test_collect[-2] if len(
-                        loss_test_collect) >= 2 else current_loss  # 若只有1个元素，用自身作为前值
+                    prev_loss = loss_test_collect[-2] if len(loss_test_collect) >= 2 else current_loss
                 else:
                     current_loss = 0.0
                     prev_loss = 0.0
                 loss_change = prev_loss - current_loss
-                data_diff = 0.5  # 实际应用中需计算真实数据分布差异
+                data_diff = 0.5
                 state = get_state(idx, offline_time, acc_change, loss_change, data_diff)
 
-                # 2. RL智能体选择修正率α
                 correction_rate = rl_agent.select_action(state)
                 print(f"[RL Decision] Client{idx} 修正率α = {correction_rate:.4f}")
 
-                # 3. 生成离线参数（使用动态α）
                 offline_w_client = {
                     k: (1 - correction_rate) * prev_w_glob_client[k] + correction_rate * (
                                 prev_w_glob_client[k] - client_corrections[idx].get(k, torch.zeros_like(
                             prev_w_glob_client[k])))
                     for k in prev_w_glob_client.keys()
                 }
-                offline_w_glob_server = {
-                    k: (1 - correction_rate) * prev_w_glob_server[k] + correction_rate * (
-                                prev_w_glob_server[k] - server_corrections[idx].get(k, torch.zeros_like(
-                            prev_w_glob_server[k])))
-                    for k in prev_w_glob_server.keys()
-                }
                 w_locals_client.append(offline_w_client)
-                w_glob_server_buffer.append(offline_w_glob_server)
 
-                # 4. 计算下一轮状态和奖励，更新RL智能体
                 next_offline_time = offline_time + 1 if idx in idx_disconnected else 0
                 next_acc = acc_test_collect[-1] if len(acc_test_collect) >= 1 else 0
                 next_loss = loss_test_collect[-1] if len(loss_test_collect) >= 1 else 0
@@ -995,47 +1020,34 @@ if __name__ == '__main__':
                 reward = get_reward(prev_acc, next_acc, prev_loss, next_loss)
                 print(f"[RL Feedback] Client{idx} 奖励 = {reward:.4f}")
 
-                # 存储经验并学习
                 rl_agent.store_transition(state, correction_rate, reward, next_state)
                 rl_agent.learn()
             else:
                 w_locals_client.append(w_client)
-                w_glob_server_buffer.append(w_glob_server)
 
-                # 更新校正项
                 global_update_client = net_glob_client.state_dict()
                 for k in global_update_client.keys():
-                    client_corrections[idx][k] = torch.clamp((global_update_client[k] - w_client[k]).float(), -1e3, 1e3)
-
-                global_update_server = net_glob_server.state_dict()
-                for k in global_update_server.keys():
-                    server_corrections[idx][k] = torch.clamp((global_update_server[k] - w_glob_server[k]).float(), -1e3,
+                    client_corrections[idx][k] = torch.clamp((global_update_client[k] - w_client[k]).float(), -1e3,
                                                              1e3)
 
-                # 测试
                 local.evaluate(w_client, ell=iter)
 
-            # 清理客户端
             cleanup_thread = threading.Thread(target=cleanup_client, args=(local,), daemon=True)
             cleanup_thread.start()
 
         running.value = False
 
-        # 更新上一轮全局参数
+        # 更新上一轮全局参数 (server updated in-place during training)
         prev_w_glob_client = {k: v.cpu() for k, v in copy.deepcopy(net_glob_client.state_dict()).items()}
-        prev_w_glob_server = {k: v.cpu() for k, v in copy.deepcopy(net_glob_server.state_dict()).items()}
 
-        # 联邦平均
+        # 联邦平均 (client-side aggregation only)
         print("------------------------------------------------------------")
         print("------ Fed Server: Federation process at Client-Side -------")
         print("------------------------------------------------------------")
 
         if len(w_locals_client) > 0:
             w_glob_client = FedAvg(w_locals_client, client_corrections, model_type='client')
-            w_glob_server = FedAvg(w_glob_server_buffer, server_corrections, model_type='server')
-
             net_glob_client.load_state_dict(w_glob_client)
-            net_glob_server.load_state_dict(w_glob_server)
 
         # 记录训练时间
         train_time = time.time() - start_time
