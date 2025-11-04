@@ -27,6 +27,7 @@ from torchvision import datasets, models
 import time
 import multiprocessing
 import copy
+from scipy.stats import dirichlet
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -707,6 +708,77 @@ def cifar_user_dataset(dataset, num_users, noniid_fraction):
     # convert to dict of sets to match other utilities
     return {i: set(dict_users[i]) for i in range(num_users)}
 
+def cifar_user_dataset_dirichlet(dataset, num_users, noniid_fraction, alpha=0.1, balanced=True, seed=None):
+    """
+    Split CIFAR dataset among users using a Dirichlet distribution.
+    
+    Args:
+        dataset: torchvision-style dataset, where each item is (image, label)
+        num_users: number of users
+        noniid_fraction: fraction of dataset assigned in non-iid way (Dirichlet distributed)
+        alpha: Dirichlet concentration parameter (smaller -> more skewed)
+        balanced: if True, each user gets the same number of samples
+        seed: random seed for reproducibility
+
+    Returns:
+        dict_users: {user_id: set of sample indices}
+    """
+    rng = np.random.RandomState(seed)
+    total_items = len(dataset)
+    num_noniid_items = int(total_items * noniid_fraction)
+    num_iid_items = total_items - num_noniid_items
+    dict_users = [[] for _ in range(num_users)]
+
+    # --- IID portion ---
+    if num_iid_items > 0:
+        all_idxs = np.arange(total_items)
+        iid_idxs = rng.choice(all_idxs, num_iid_items, replace=False)
+        per_user_iid = num_iid_items // num_users
+        for i in range(num_users):
+            start = i * per_user_iid
+            end = (i + 1) * per_user_iid
+            dict_users[i].extend(iid_idxs[start:end])
+        remaining = list(set(all_idxs) - set(iid_idxs))
+    else:
+        remaining = np.arange(total_items)
+
+    # --- NON-IID (Dirichlet) portion ---
+    if num_noniid_items > 0:
+        labels = np.array([dataset[i][1] for i in remaining])
+        idxs = np.array(remaining)
+
+        # 统计每个类别索引
+        classes = np.unique(labels)
+        user_indices = [[] for _ in range(num_users)]
+
+        for c in classes:
+            idx_c = idxs[labels == c]
+            # 每个类别的样本按 Dirichlet 分布到各用户
+            proportions = rng.dirichlet(alpha=np.ones(num_users) * alpha)
+            # 按比例分配
+            split_points = (np.cumsum(proportions) * len(idx_c)).astype(int)
+            split_points[-1] = len(idx_c)
+            split_indices = np.split(idx_c, split_points[:-1])
+            for i in range(num_users):
+                user_indices[i].extend(split_indices[i])
+
+        # --- 严格平衡控制（仅样本数量平衡，不改类别分布） ---
+        if balanced:
+            all_indices = np.concatenate(user_indices)
+            rng.shuffle(all_indices)
+            samples_per_user = len(all_indices) // num_users
+            for i in range(num_users):
+                start = i * samples_per_user
+                end = (i + 1) * samples_per_user
+                dict_users[i].extend(all_indices[start:end])
+        else:
+            # 不平衡：直接按 Dirichlet 分配
+            for i in range(num_users):
+                dict_users[i].extend(user_indices[i])
+
+    # --- 返回结果 ---
+    return {i: set(dict_users[i]) for i in range(num_users)}
+
 
 
 def monitor_heartbeats(heartbeat_queue, num_users):
@@ -831,6 +903,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr", type=float, default=0.001, help='Learning rate')
     parser.add_argument("--rl_lr", type=float, default=1e-3, help="RL agent learning rate")
     parser.add_argument("--alpha_reward", type=float, default=0.5, help="Reward loss penalty coefficient")
+    parser.add_argument("--noniid_fraction", type=float, default=1.0, help="Fraction of non-IID data distribution (0~1)")
     args = parser.parse_args()
 
     SEED = 1234
@@ -860,6 +933,7 @@ if __name__ == '__main__':
     correction_rate = args.correction_rate
     local_ep = args.local_ep
     frac = 1  # participation of clients; if 1 then 100% clients participate in SFLV2
+    noniid_fraction = args.noniid_fraction if hasattr(args, 'noniid_fraction') else 1.0
     lr = args.lr
     lr_decay = args.lr_decay
     train_times = []
@@ -942,7 +1016,7 @@ if __name__ == '__main__':
         transform=test_transforms
     )
 
-    dict_users = cifar_user_dataset(dataset_train, num_users, noniid_fraction=1.0)
+    dict_users = cifar_user_dataset_dirichlet(dataset_train, num_users, noniid_fraction=noniid_fraction, alpha=0.1)
     dict_users_test = dataset_iid(dataset_test, num_users)
     draw_data_distribution(dict_users, dataset_train, num_users,
                            save_path='output/data_distribution.png')
@@ -1153,7 +1227,7 @@ if __name__ == '__main__':
     plt.ylabel('Training Time (s)')
     plt.title('Training Time Curve')
     plt.grid(True)
-    prefix = f"_CIFAR10_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_rlCR_le{args.local_ep}_lr{args.lr}"
+    prefix = f"_CIFAR10_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_rlCR_le{args.local_ep}_lr{args.lr}_noniid{args.noniid_fraction:.2f}"
     curve_filename = os.path.join(curve_dir, f'train_time_curve{prefix}_' + time.strftime("%Y%m%d-%H%M%S", time.localtime()) + '.png')
     plt.savefig(curve_filename)
     plt.clf()
