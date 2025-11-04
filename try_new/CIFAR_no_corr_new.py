@@ -352,7 +352,7 @@ class Client(object):
         self.idx_disconnected_time = idx_disconnected_time
         self.running = running
         self.status = "idle"
-        self.heartbeat_interval = 10
+        self.heartbeat_interval = 5
         self.stop_heartbeat_flag = False
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
         self.heartbeat_thread.start()
@@ -917,7 +917,7 @@ if __name__ == '__main__':
     )
 
     # 数据集划分: use cifar_user_dataset non-iid split similar to v2_cifar10.py
-    dict_users = cifar_user_dataset(dataset_train, num_users, noniid_fraction=0.8)
+    dict_users = cifar_user_dataset(dataset_train, num_users, noniid_fraction=1.0)
     dict_users_test = dataset_iid(dataset_test, num_users)
     draw_data_distribution(dict_users, dataset_train, num_users,
                            save_path='output/data_distribution.png')
@@ -1059,7 +1059,7 @@ if __name__ == '__main__':
     plt.ylabel('Training Time (s)')
     plt.title('Training Time Curve')
     plt.grid(True)
-    prefix = f"_CIFAR10_no_corr_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_le{args.local_ep}_lr{args.lr}"
+    prefix = f"_CIFAR10_ep{args.epochs}_dp{args.disconnect_prob:.2f}_dr{args.disconnect_round}_le{args.local_ep}_lr{args.lr}"
     curve_filename = os.path.join(curve_dir, f'train_time_curve{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                           time.localtime()) + '.png')
     plt.savefig(curve_filename)
@@ -1086,19 +1086,19 @@ if __name__ == '__main__':
     acc_test_df = pd.DataFrame(acc_test_collect_list)
     loss_test_df = pd.DataFrame(loss_test_collect_list)
 
-    acc_train_filename = os.path.join(acc_dir, f'Client_Acc_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+    acc_train_filename = os.path.join(acc_dir, f'Client_Acc_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                            time.localtime()) + '.csv')
     acc_train_df.to_csv(acc_train_filename, index=False)
 
-    loss_train_filename = os.path.join(loss_dir, f'Client_Loss_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+    loss_train_filename = os.path.join(loss_dir, f'Client_Loss_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                               time.localtime()) + '.csv')
     loss_train_df.to_csv(loss_train_filename, index=False)
 
-    acc_test_filename = os.path.join(acc_dir, f'Server_Acc_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+    acc_test_filename = os.path.join(acc_dir, f'Server_Acc_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                           time.localtime()) + '.csv')
     acc_test_df.to_csv(acc_test_filename, index=False)
 
-    loss_test_filename = os.path.join(loss_dir, f'Server_Loss_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+    loss_test_filename = os.path.join(loss_dir, f'Server_Loss_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                              time.localtime()) + '.csv')
     loss_test_df.to_csv(loss_test_filename, index=False)
 
@@ -1112,7 +1112,7 @@ if __name__ == '__main__':
     plt.grid(True)
 
     acc_curve_filename = os.path.join(curve_dir,
-                                      f'acc_curve_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+                                      f'acc_curve_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                  time.localtime()) + '.png')
     plt.savefig(acc_curve_filename)
     plt.clf()
@@ -1127,7 +1127,7 @@ if __name__ == '__main__':
     plt.grid(True)
 
     loss_curve_filename = os.path.join(curve_dir,
-                                       f'loss_curve_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
+                                       f'loss_curve_no_Corr{prefix}_' + time.strftime("%Y%m%d-%H%M%S",
                                                                                    time.localtime()) + '.png')
     plt.savefig(loss_curve_filename)
     print('Data saved successfully!')

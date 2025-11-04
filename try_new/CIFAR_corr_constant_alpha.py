@@ -352,7 +352,7 @@ class Client(object):
         self.idx_disconnected_time = idx_disconnected_time
         self.running = running
         self.status = "idle"
-        self.heartbeat_interval = 10
+        self.heartbeat_interval = 5
         self.stop_heartbeat_flag = False
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
         self.heartbeat_thread.start()
@@ -812,7 +812,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_decay', type=float, default=1, help='Learning rate decay factor')
     parser.add_argument("--lr", type=float, default=0.001, help='Learning rate')
     parser.add_argument("--rl_lr", type=float, default=0.001, help='RL agent learning rate')
-    parser.add_argument("--correction_rate", type=float, default=None, help='Fixed correction rate (alpha) for disconnected clients; if set, disables RL and uses this value')
+    parser.add_argument("--correction_rate", type=float, default=0.5, help='Fixed correction rate (alpha) for disconnected clients; if set, disables RL and uses this value')
     args = parser.parse_args()
 
     SEED = 1234
@@ -921,7 +921,7 @@ if __name__ == '__main__':
     )
 
     # 数据集划分: use cifar_user_dataset non-iid split similar to v2_cifar10.py
-    dict_users = cifar_user_dataset(dataset_train, num_users, noniid_fraction=0.8)
+    dict_users = cifar_user_dataset(dataset_train, num_users, noniid_fraction=1.0)
     dict_users_test = dataset_iid(dataset_test, num_users)
     draw_data_distribution(dict_users, dataset_train, num_users,
                            save_path='output/data_distribution.png')
