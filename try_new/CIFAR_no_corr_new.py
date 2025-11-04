@@ -649,75 +649,104 @@ def cifar_user_dataset(dataset, num_users, noniid_fraction):
     # convert to dict of sets to match other utilities
     return {i: set(dict_users[i]) for i in range(num_users)}
 
-def cifar_user_dataset_dirichlet(dataset, num_users, noniid_fraction, alpha=0.1, balanced=True, seed=None):
+def cifar_user_dataset_dirichlet(dataset, num_users, noniid_fraction,
+                                 alpha=0.1, balanced=True, seed=None):
     """
-    Split CIFAR dataset among users using a Dirichlet distribution.
-    
+    Split CIFAR dataset among users using Dirichlet distribution for non-IID partitioning,
+    with optional balancing of total sample counts per user while preserving class skewness.
+
     Args:
-        dataset: torchvision-style dataset, where each item is (image, label)
+        dataset: torch.utils.data.Dataset, (data, label)
         num_users: number of users
-        noniid_fraction: fraction of dataset assigned in non-iid way (Dirichlet distributed)
-        alpha: Dirichlet concentration parameter (smaller -> more skewed)
-        balanced: if True, each user gets the same number of samples
-        seed: random seed for reproducibility
+        noniid_fraction: fraction of dataset assigned by Dirichlet (rest IID)
+        alpha: Dirichlet concentration parameter (smaller => more non-IID)
+        balanced: if True, enforce equal total sample counts while keeping class imbalance
+        seed: random seed
 
     Returns:
-        dict_users: {user_id: set of sample indices}
+        dict_users: {user_id: set(sample_indices)}
     """
-    rng = np.random.RandomState(seed)
+    if seed is not None:
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+
     total_items = len(dataset)
     num_noniid_items = int(total_items * noniid_fraction)
     num_iid_items = total_items - num_noniid_items
-    dict_users = [[] for _ in range(num_users)]
+    all_idxs = np.arange(total_items)
+    dict_users = {i: set() for i in range(num_users)}
 
-    # --- IID portion ---
+    # ====================
+    # 1. IID portion (均匀分配)
+    # ====================
     if num_iid_items > 0:
-        all_idxs = np.arange(total_items)
-        iid_idxs = rng.choice(all_idxs, num_iid_items, replace=False)
-        per_user_iid = num_iid_items // num_users
+        iid_idxs = np.random.choice(all_idxs, num_iid_items, replace=False)
+        all_idxs = np.setdiff1d(all_idxs, iid_idxs)
+        per_user = num_iid_items // num_users
         for i in range(num_users):
-            start = i * per_user_iid
-            end = (i + 1) * per_user_iid
-            dict_users[i].extend(iid_idxs[start:end])
-        remaining = list(set(all_idxs) - set(iid_idxs))
-    else:
-        remaining = np.arange(total_items)
+            start = i * per_user
+            end = (i + 1) * per_user if i != num_users - 1 else len(iid_idxs)
+            dict_users[i].update(iid_idxs[start:end])
 
-    # --- NON-IID (Dirichlet) portion ---
+    # ====================
+    # 2. Dirichlet portion
+    # ====================
     if num_noniid_items > 0:
-        labels = np.array([dataset[i][1] for i in remaining])
-        idxs = np.array(remaining)
+        noniid_idxs = np.random.choice(all_idxs, num_noniid_items, replace=False)
+        labels = np.array([dataset[i][1] for i in noniid_idxs])
+        unique_labels = np.unique(labels)
 
-        # 统计每个类别索引
-        classes = np.unique(labels)
+        # 每个类别的样本索引
+        label_indices = {label: np.where(labels == label)[0] for label in unique_labels}
         user_indices = [[] for _ in range(num_users)]
 
-        for c in classes:
-            idx_c = idxs[labels == c]
-            # 每个类别的样本按 Dirichlet 分布到各用户
-            proportions = rng.dirichlet(alpha=np.ones(num_users) * alpha)
-            # 按比例分配
-            split_points = (np.cumsum(proportions) * len(idx_c)).astype(int)
-            split_points[-1] = len(idx_c)
-            split_indices = np.split(idx_c, split_points[:-1])
-            for i in range(num_users):
-                user_indices[i].extend(split_indices[i])
+        # Dirichlet 分配类别比例
+        for label in unique_labels:
+            idxs_label = label_indices[label]
+            np.random.shuffle(idxs_label)
+            proportions = np.random.dirichlet([alpha] * num_users)
+            proportions = np.clip(proportions, 1e-6, 1)
+            proportions = proportions / proportions.sum()
+            split_points = (np.cumsum(proportions) * len(idxs_label)).astype(int)
+            prev = 0
+            for i, sp in enumerate(split_points):
+                user_indices[i].extend(noniid_idxs[idxs_label[prev:sp]])
+                prev = sp
 
-        # --- 严格平衡控制（仅样本数量平衡，不改类别分布） ---
+        # ====================
+        # 3. Balanced equal-size adjustment
+        # ====================
         if balanced:
-            all_indices = np.concatenate(user_indices)
-            rng.shuffle(all_indices)
-            samples_per_user = len(all_indices) // num_users
-            for i in range(num_users):
-                start = i * samples_per_user
-                end = (i + 1) * samples_per_user
-                dict_users[i].extend(all_indices[start:end])
-        else:
-            # 不平衡：直接按 Dirichlet 分配
-            for i in range(num_users):
-                dict_users[i].extend(user_indices[i])
+            # 每个用户目标样本数
+            total_per_user = num_noniid_items // num_users
+            # 统计实际样本量
+            lengths = [len(u) for u in user_indices]
 
-    # --- 返回结果 ---
+            # 过多者裁剪、过少者补齐
+            global_pool = np.concatenate(user_indices)
+            np.random.shuffle(global_pool)
+            pool_iter = iter(global_pool)
+
+            new_user_indices = []
+            for i in range(num_users):
+                data_i = np.array(user_indices[i])
+                if len(data_i) > total_per_user:
+                    # 裁剪（保留内部类别分布尽量不变）
+                    keep_idxs = np.random.choice(len(data_i), total_per_user, replace=False)
+                    data_i = data_i[keep_idxs]
+                elif len(data_i) < total_per_user:
+                    # 从全局池中随机补齐
+                    deficit = total_per_user - len(data_i)
+                    extra = [next(pool_iter) for _ in range(deficit)]
+                    data_i = np.concatenate([data_i, extra])
+                new_user_indices.append(data_i)
+            user_indices = new_user_indices
+        # ====================
+        # 4. 汇总结果
+        # ====================
+        for i in range(num_users):
+            dict_users[i].update(user_indices[i])
+
     return {i: set(dict_users[i]) for i in range(num_users)}
 
 
@@ -992,7 +1021,7 @@ if __name__ == '__main__':
 
     # 数据集划分: use cifar_user_dataset non-iid split similar to v2_cifar10.py
     # dict_users = cifar_user_dataset(dataset_train, num_users, noniid_fraction=noniid_fraction)
-    dict_users = cifar_user_dataset_dirichlet(dataset_train, num_users, noniid_fraction=noniid_fraction, alpha=0.1)
+    dict_users = cifar_user_dataset_dirichlet(dataset_train, num_users, noniid_fraction=noniid_fraction, alpha=0.1, balanced=False, seed=27)
     dict_users_test = dataset_iid(dataset_test, num_users)
     draw_data_distribution(dict_users, dataset_train, num_users,
                            save_path='output/data_distribution.png')
