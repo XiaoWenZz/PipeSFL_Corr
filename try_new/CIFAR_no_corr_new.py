@@ -130,10 +130,22 @@ class ResNet50_server_side(nn.Module):
 # ====================================================================================================
 #                                  服务端程序
 # ====================================================================================================
-def FedAvg(w, corrections, model_type):
+def FedAvg(w, corrections, model_type, weights=None):
+    """
+    Federated averaging with optional sample-count weights.
+
+    Args:
+        w: list of state_dicts (each a dict of tensors)
+        corrections: unused here but kept for compatibility with callers
+        model_type: 'client' or 'server' to pick param keys
+        weights: optional list of non-negative numbers with same length as w
+    Returns:
+        w_avg: aggregated state_dict
+    """
     if not w:
         return {}
 
+    # ensure tensors are float
     w = [{k: v.float() for k, v in params.items()} for params in w]
 
     if model_type == 'client':
@@ -145,14 +157,42 @@ def FedAvg(w, corrections, model_type):
     else:
         raise ValueError("Invalid model_type")
 
+    # single contributor -> return copy
     if len(w) == 1:
         return w_avg
 
+    # prepare weights
+    use_weights = False
+    if weights is not None:
+        try:
+            if len(weights) == len(w):
+                w_tensor = torch.tensor(weights, dtype=torch.float)
+                s = float(w_tensor.sum())
+                if s > 0:
+                    w_norm = (w_tensor / s).tolist()
+                    use_weights = True
+                else:
+                    use_weights = False
+            else:
+                print(f"[Warning] weights length ({len(weights)}) != number of models ({len(w)}), falling back to uniform average")
+                use_weights = False
+        except Exception:
+            use_weights = False
+
+    # aggregate
     for k in param_keys:
-        total = w_avg[k].clone()
-        for i, params in enumerate(w[1:], start=1):
-            total += params[k].cpu()
-        w_avg[k] = total / len(w)
+        if use_weights:
+            total = torch.zeros_like(w_avg[k])
+            for i, params in enumerate(w):
+                total = total + params[k].cpu() * float(w_norm[i])
+            w_avg[k] = total
+        else:
+            # uniform average
+            total = w_avg[k].clone()
+            for params in w[1:]:
+                total += params[k].cpu()
+            w_avg[k] = total / len(w)
+
     return w_avg
 
 
@@ -649,105 +689,104 @@ def cifar_user_dataset(dataset, num_users, noniid_fraction):
     # convert to dict of sets to match other utilities
     return {i: set(dict_users[i]) for i in range(num_users)}
 
-def cifar_user_dataset_dirichlet(dataset, num_users, noniid_fraction,
-                                 alpha=0.1, balanced=True, seed=None):
+import numpy as np
+from collections import defaultdict
+
+def cifar_user_dataset_dirichlet(dataset, num_users, noniid_fraction, alpha=0.1, balanced=True, seed=None):
     """
-    Split CIFAR dataset among users using Dirichlet distribution for non-IID partitioning,
-    with optional balancing of total sample counts per user while preserving class skewness.
+    CIFAR dataset split using Dirichlet distribution (α controls non-IID level).
 
     Args:
-        dataset: torch.utils.data.Dataset, (data, label)
-        num_users: number of users
-        noniid_fraction: fraction of dataset assigned by Dirichlet (rest IID)
-        alpha: Dirichlet concentration parameter (smaller => more non-IID)
-        balanced: if True, enforce equal total sample counts while keeping class imbalance
-        seed: random seed
-
+        dataset: PyTorch dataset (each item -> (data, label))
+        num_users: int, number of users
+        noniid_fraction: float ∈ [0,1], portion of dataset assigned non-IID
+        alpha: float, Dirichlet concentration parameter (smaller => stronger non-IID)
+        balanced: bool, if True each user has same # of samples (data-count balanced)
+        seed: int or None, random seed for reproducibility
     Returns:
-        dict_users: {user_id: set(sample_indices)}
+        dict_users: {user_id: set(sample_indices)} — same output format as original
     """
     if seed is not None:
         np.random.seed(seed)
-        torch.manual_seed(seed)
 
     total_items = len(dataset)
     num_noniid_items = int(total_items * noniid_fraction)
     num_iid_items = total_items - num_noniid_items
-    all_idxs = np.arange(total_items)
-    dict_users = {i: set() for i in range(num_users)}
+    all_indices = np.arange(total_items)
 
-    # ====================
-    # 1. IID portion (均匀分配)
-    # ====================
+    dict_users = [set() for _ in range(num_users)]
+
+    # -------------------- #
+    # 1️⃣ IID 部分
+    # -------------------- #
     if num_iid_items > 0:
-        iid_idxs = np.random.choice(all_idxs, num_iid_items, replace=False)
-        all_idxs = np.setdiff1d(all_idxs, iid_idxs)
-        per_user = num_iid_items // num_users
+        iid_indices = np.random.choice(all_indices, num_iid_items, replace=False)
+        all_indices = np.setdiff1d(all_indices, iid_indices)
+        per_user_iid = num_iid_items // num_users
         for i in range(num_users):
-            start = i * per_user
-            end = (i + 1) * per_user if i != num_users - 1 else len(iid_idxs)
-            dict_users[i].update(iid_idxs[start:end])
+            chosen = iid_indices[i * per_user_iid : (i + 1) * per_user_iid]
+            dict_users[i].update(chosen)
 
-    # ====================
-    # 2. Dirichlet portion
-    # ====================
+    # -------------------- #
+    # 2️⃣ 非IID部分 (Dirichlet)
+    # -------------------- #
     if num_noniid_items > 0:
-        noniid_idxs = np.random.choice(all_idxs, num_noniid_items, replace=False)
-        labels = np.array([dataset[i][1] for i in noniid_idxs])
-        unique_labels = np.unique(labels)
+        noniid_indices = all_indices
+        labels = np.array([dataset[i][1] for i in noniid_indices])
+        num_classes = len(np.unique(labels))
 
-        # 每个类别的样本索引
-        label_indices = {label: np.where(labels == label)[0] for label in unique_labels}
-        user_indices = [[] for _ in range(num_users)]
+        class_indices = {c: np.where(labels == c)[0] for c in np.unique(labels)}
+        class_proportions = np.random.dirichlet([alpha] * num_users, size=num_classes)
 
-        # Dirichlet 分配类别比例
-        for label in unique_labels:
-            idxs_label = label_indices[label]
-            np.random.shuffle(idxs_label)
-            proportions = np.random.dirichlet([alpha] * num_users)
-            proportions = np.clip(proportions, 1e-6, 1)
-            proportions = proportions / proportions.sum()
-            split_points = (np.cumsum(proportions) * len(idxs_label)).astype(int)
-            prev = 0
-            for i, sp in enumerate(split_points):
-                user_indices[i].extend(noniid_idxs[idxs_label[prev:sp]])
-                prev = sp
+        user_data = defaultdict(list)
+        for c, idxs in class_indices.items():
+            np.random.shuffle(idxs)
+            props = class_proportions[c]
+            class_split = (np.cumsum(props) * len(idxs)).astype(int)
+            split_indices = np.split(idxs, class_split[:-1])
+            for u, idxs_u in enumerate(split_indices):
+                user_data[u].extend(noniid_indices[idxs_u])
 
-        # ====================
-        # 3. Balanced equal-size adjustment
-        # ====================
-        if balanced:
-            # 每个用户目标样本数
-            total_per_user = num_noniid_items // num_users
-            # 统计实际样本量
-            lengths = [len(u) for u in user_indices]
+        for u in range(num_users):
+            dict_users[u].update(user_data[u])
 
-            # 过多者裁剪、过少者补齐
-            global_pool = np.concatenate(user_indices)
-            np.random.shuffle(global_pool)
-            pool_iter = iter(global_pool)
+    # -------------------- #
+    # 3️⃣ 平衡处理（无数据丢失）
+    # -------------------- #
+    if balanced:
+        total_per_user = total_items // num_users
+        all_used = set()
+        extra_pool = []
 
-            new_user_indices = []
-            for i in range(num_users):
-                data_i = np.array(user_indices[i])
-                if len(data_i) > total_per_user:
-                    # 裁剪（保留内部类别分布尽量不变）
-                    keep_idxs = np.random.choice(len(data_i), total_per_user, replace=False)
-                    data_i = data_i[keep_idxs]
-                elif len(data_i) < total_per_user:
-                    # 从全局池中随机补齐
-                    deficit = total_per_user - len(data_i)
-                    extra = [next(pool_iter) for _ in range(deficit)]
-                    data_i = np.concatenate([data_i, extra])
-                new_user_indices.append(data_i)
-            user_indices = new_user_indices
-        # ====================
-        # 4. 汇总结果
-        # ====================
-        for i in range(num_users):
-            dict_users[i].update(user_indices[i])
+        # Step 1: 裁剪过多样本并收集多余的
+        for u in range(num_users):
+            data_u = list(dict_users[u])
+            if len(data_u) > total_per_user:
+                keep = np.random.choice(data_u, total_per_user, replace=False)
+                extra = list(set(data_u) - set(keep))
+                dict_users[u] = set(keep)
+                extra_pool.extend(extra)
+            all_used.update(dict_users[u])
 
+        # Step 2: 构建补齐池（包含未用样本 + 裁剪样本）
+        remaining = list(set(np.arange(total_items)) - all_used)
+        remaining.extend(extra_pool)
+        np.random.shuffle(remaining)
+
+        # Step 3: 补齐不足用户（无重复）
+        ptr = 0
+        for u in range(num_users):
+            need = total_per_user - len(dict_users[u])
+            if need > 0:
+                add_samples = remaining[ptr: ptr + need]
+                dict_users[u].update(add_samples)
+                ptr += need
+
+    # -------------------- #
+    # 4️⃣ 输出
+    # -------------------- #
     return {i: set(dict_users[i]) for i in range(num_users)}
+
 
 
 def monitor_heartbeats(heartbeat_queue, num_users):
@@ -1026,6 +1065,20 @@ if __name__ == '__main__':
     draw_data_distribution(dict_users, dataset_train, num_users,
                            save_path='output/data_distribution.png')
 
+    # 输出每个客户端的数据量（用于加权聚合的权重）——仅输出一次，便于检查数据划分
+    try:
+        client_sample_counts = [len(dict_users[i]) for i in range(num_users)]
+        total_samples = sum(client_sample_counts)
+        print(f"[Info] Client sample counts: {client_sample_counts}")
+        print(f"[Info] Total samples: {total_samples}")
+        if total_samples > 0:
+            normalized = [c / total_samples for c in client_sample_counts]
+        else:
+            normalized = [0 for _ in client_sample_counts]
+        print(f"[Info] Normalized aggregation weights: {normalized}")
+    except Exception as e:
+        print(f"[Warning] Failed to compute client sample counts: {e}")
+
     # NOTE: correction / offline simulation removed — if client is disconnected we skip it entirely
 
     # 训练和测试
@@ -1039,6 +1092,7 @@ if __name__ == '__main__':
         m = max(int(frac * num_users), 1)
         idxs_users = np.random.choice(range(num_users), m, replace=False)
         w_locals_client = []
+        w_locals_weights = []
 
         global_seed = iter
         numpy.random.seed(global_seed)
@@ -1087,6 +1141,12 @@ if __name__ == '__main__':
                 pass
             else:
                 w_locals_client.append(w_client)
+                # collect number of samples held by this client for weighted aggregation
+                try:
+                    sample_count = len(dict_users[idx])
+                except Exception:
+                    sample_count = 0
+                w_locals_weights.append(sample_count)
 
                 # 在线客户端正常添加到聚合列表
                 # no correction bookkeeping required in this 'no-correction' mode
@@ -1107,7 +1167,7 @@ if __name__ == '__main__':
         print("------------------------------------------------------------")
 
         if len(w_locals_client) > 0:
-            w_glob_client = FedAvg(w_locals_client, None, model_type='client')
+            w_glob_client = FedAvg(w_locals_client, None, model_type='client', weights=w_locals_weights)
             net_glob_client.load_state_dict(w_glob_client)
 
         # 记录训练时间

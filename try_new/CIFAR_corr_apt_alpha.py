@@ -135,10 +135,22 @@ class ResNet50_server_side(nn.Module):
 #                                  Server Side Programs
 # ====================================================================================================
 # Federated averaging: FedAvg
-def FedAvg(w, corrections, model_type):
+def FedAvg(w, corrections, model_type, weights=None):
+    """
+    Federated averaging with optional sample-count weights.
+
+    Args:
+        w: list of state_dicts (each a dict of tensors)
+        corrections: unused here but kept for compatibility with callers
+        model_type: 'client' or 'server' to pick param keys
+        weights: optional list of non-negative numbers with same length as w
+    Returns:
+        w_avg: aggregated state_dict
+    """
     if not w:
         return {}
 
+    # ensure tensors are float
     w = [{k: v.float() for k, v in params.items()} for params in w]
 
     if model_type == 'client':
@@ -150,14 +162,42 @@ def FedAvg(w, corrections, model_type):
     else:
         raise ValueError("Invalid model_type")
 
+    # single contributor -> return copy
     if len(w) == 1:
         return w_avg
 
+    # prepare weights
+    use_weights = False
+    if weights is not None:
+        try:
+            if len(weights) == len(w):
+                w_tensor = torch.tensor(weights, dtype=torch.float)
+                s = float(w_tensor.sum())
+                if s > 0:
+                    w_norm = (w_tensor / s).tolist()
+                    use_weights = True
+                else:
+                    use_weights = False
+            else:
+                print(f"[Warning] weights length ({len(weights)}) != number of models ({len(w)}), falling back to uniform average")
+                use_weights = False
+        except Exception:
+            use_weights = False
+
+    # aggregate
     for k in param_keys:
-        total = w_avg[k].clone()
-        for i, params in enumerate(w[1:], start=1):
-            total += params[k].cpu()
-        w_avg[k] = total / len(w)
+        if use_weights:
+            total = torch.zeros_like(w_avg[k])
+            for i, params in enumerate(w):
+                total = total + params[k].cpu() * float(w_norm[i])
+            w_avg[k] = total
+        else:
+            # uniform average
+            total = w_avg[k].clone()
+            for params in w[1:]:
+                total += params[k].cpu()
+            w_avg[k] = total / len(w)
+
     return w_avg
 
 
@@ -1048,6 +1088,19 @@ if __name__ == '__main__':
     dict_users_test = dataset_iid(dataset_test, num_users)
     draw_data_distribution(dict_users, dataset_train, num_users,
                            save_path='output/data_distribution.png')
+    # 输出每个客户端的数据量（用于加权聚合的权重）——仅输出一次，便于检查数据划分
+    try:
+        client_sample_counts = [len(dict_users[i]) for i in range(num_users)]
+        total_samples = sum(client_sample_counts)
+        print(f"[Info] Client sample counts: {client_sample_counts}")
+        print(f"[Info] Total samples: {total_samples}")
+        if total_samples > 0:
+            normalized = [c / total_samples for c in client_sample_counts]
+        else:
+            normalized = [0 for _ in client_sample_counts]
+        print(f"[Info] Normalized aggregation weights: {normalized}")
+    except Exception as e:
+        print(f"[Warning] Failed to compute client sample counts: {e}")
 
     net_glob_client.train()
     w_glob_client = net_glob_client.state_dict()
@@ -1072,6 +1125,7 @@ if __name__ == '__main__':
         idxs_users = np.random.choice(range(num_users), m, replace=False)
         w_locals_client = []
         w_glob_server_buffer = []
+        w_locals_weights = []
 
         global_seed = iter  # 可自定义种子值
         numpy.random.seed(global_seed)
@@ -1131,9 +1185,21 @@ if __name__ == '__main__':
                 }
                 w_locals_client.append(offline_w_client)
                 w_glob_server_buffer.append(offline_w_glob_server)
+                # collect sample count for weighted aggregation
+                try:
+                    sample_count = len(dict_users[idx])
+                except Exception:
+                    sample_count = 0
+                w_locals_weights.append(sample_count)
             else:
                 w_locals_client.append(w_client)  # 已在 CPU
                 w_glob_server_buffer.append(w_glob_server)  # 已在 CPU
+                # collect sample count for weighted aggregation
+                try:
+                    sample_count = len(dict_users[idx])
+                except Exception:
+                    sample_count = 0
+                w_locals_weights.append(sample_count)
 
                 # 客户端训练后，更新客户端校正项
                 global_update_client = net_glob_client.state_dict()
@@ -1164,8 +1230,8 @@ if __name__ == '__main__':
         if len(w_locals_client) == 0:
             print("No clients available for Federated Learning!")
         else:
-            w_glob_client = FedAvg(w_locals_client, client_corrections, model_type='client')
-            w_glob_server = FedAvg(w_glob_server_buffer, server_corrections, model_type='server')
+            w_glob_client = FedAvg(w_locals_client, client_corrections, model_type='client', weights=w_locals_weights)
+            w_glob_server = FedAvg(w_glob_server_buffer, server_corrections, model_type='server', weights=w_locals_weights)
             net_glob_client.load_state_dict(w_glob_client)
             net_glob_server.load_state_dict(w_glob_server)
 
