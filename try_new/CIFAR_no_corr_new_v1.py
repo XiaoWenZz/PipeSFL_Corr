@@ -677,6 +677,104 @@ def cifar_user_dataset(dataset, num_users, noniid_fraction):
     # convert to dict of sets to match other utilities
     return {i: set(dict_users[i]) for i in range(num_users)}
 
+from collections import defaultdict
+
+def cifar_user_dataset_dirichlet(dataset, num_users, noniid_fraction, alpha=0.1, balanced=True, seed=None):
+    """
+    CIFAR dataset split using Dirichlet distribution (α controls non-IID level).
+
+    Args:
+        dataset: PyTorch dataset (each item -> (data, label))
+        num_users: int, number of users
+        noniid_fraction: float ∈ [0,1], portion of dataset assigned non-IID
+        alpha: float, Dirichlet concentration parameter (smaller => stronger non-IID)
+        balanced: bool, if True each user has same # of samples (data-count balanced)
+        seed: int or None, random seed for reproducibility
+    Returns:
+        dict_users: {user_id: set(sample_indices)} — same output format as original
+    """
+    if seed is not None:
+        np.random.seed(seed)
+
+    total_items = len(dataset)
+    num_noniid_items = int(total_items * noniid_fraction)
+    num_iid_items = total_items - num_noniid_items
+    all_indices = np.arange(total_items)
+
+    dict_users = [set() for _ in range(num_users)]
+
+    # -------------------- #
+    # 1️⃣ IID 部分
+    # -------------------- #
+    if num_iid_items > 0:
+        iid_indices = np.random.choice(all_indices, num_iid_items, replace=False)
+        all_indices = np.setdiff1d(all_indices, iid_indices)
+        per_user_iid = num_iid_items // num_users
+        for i in range(num_users):
+            chosen = iid_indices[i * per_user_iid : (i + 1) * per_user_iid]
+            dict_users[i].update(chosen)
+
+    # -------------------- #
+    # 2️⃣ 非IID部分 (Dirichlet)
+    # -------------------- #
+    if num_noniid_items > 0:
+        noniid_indices = all_indices
+        labels = np.array([dataset[i][1] for i in noniid_indices])
+        num_classes = len(np.unique(labels))
+
+        class_indices = {c: np.where(labels == c)[0] for c in np.unique(labels)}
+        class_proportions = np.random.dirichlet([alpha] * num_users, size=num_classes)
+
+        user_data = defaultdict(list)
+        for c, idxs in class_indices.items():
+            np.random.shuffle(idxs)
+            props = class_proportions[c]
+            class_split = (np.cumsum(props) * len(idxs)).astype(int)
+            split_indices = np.split(idxs, class_split[:-1])
+            for u, idxs_u in enumerate(split_indices):
+                user_data[u].extend(noniid_indices[idxs_u])
+
+        for u in range(num_users):
+            dict_users[u].update(user_data[u])
+
+    # -------------------- #
+    # 3️⃣ 平衡处理（无数据丢失）
+    # -------------------- #
+    if balanced:
+        total_per_user = total_items // num_users
+        all_used = set()
+        extra_pool = []
+
+        # Step 1: 裁剪过多样本并收集多余的
+        for u in range(num_users):
+            data_u = list(dict_users[u])
+            if len(data_u) > total_per_user:
+                keep = np.random.choice(data_u, total_per_user, replace=False)
+                extra = list(set(data_u) - set(keep))
+                dict_users[u] = set(keep)
+                extra_pool.extend(extra)
+            all_used.update(dict_users[u])
+
+        # Step 2: 构建补齐池（包含未用样本 + 裁剪样本）
+        remaining = list(set(np.arange(total_items)) - all_used)
+        remaining.extend(extra_pool)
+        np.random.shuffle(remaining)
+
+        # Step 3: 补齐不足用户（无重复）
+        ptr = 0
+        for u in range(num_users):
+            need = total_per_user - len(dict_users[u])
+            if need > 0:
+                add_samples = remaining[ptr: ptr + need]
+                dict_users[u].update(add_samples)
+                ptr += need
+
+    # -------------------- #
+    # 4️⃣ 输出
+    # -------------------- #
+    return {i: set(dict_users[i]) for i in range(num_users)}
+
+
 
 def monitor_heartbeats(heartbeat_queue, num_users):
     client_status = {i: {"status": "idle", "last_heartbeat": "", "type": "normal"} for i in range(num_users)}
@@ -841,6 +939,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_decay', type=float, default=1, help='Learning rate decay factor')
     parser.add_argument("--lr", type=float, default=0.001, help='Learning rate')
     parser.add_argument("--rl_lr", type=float, default=0.001, help='RL agent learning rate')
+    parser.add_argument("--noniid_fraction", type=float, default=1.0, help='Fraction of non-iid data distribution')
     args = parser.parse_args()
 
     SEED = 1234
@@ -868,6 +967,7 @@ if __name__ == '__main__':
     disconnect_round = args.disconnect_round
     local_ep = args.local_ep
     frac = 1
+    noniid_fraction = args.noniid_fraction if hasattr(args, 'noniid_fraction') else 1.0
     lr = args.lr
     lr_decay = args.lr_decay
     train_times = []
@@ -946,7 +1046,8 @@ if __name__ == '__main__':
     )
 
     # 数据集划分: use cifar_user_dataset non-iid split similar to v2_cifar10.py
-    dict_users = cifar_user_dataset(dataset_train, num_users, noniid_fraction=1.0)
+    # dict_users = cifar_user_dataset(dataset_train, num_users, noniid_fraction=1.0)
+    dict_users = cifar_user_dataset_dirichlet(dataset_train, num_users, noniid_fraction=noniid_fraction, alpha=0.2, balanced=False, seed=27)
     dict_users_test = dataset_iid(dataset_test, num_users)
     draw_data_distribution(dict_users, dataset_train, num_users,
                            save_path='output/data_distribution.png')

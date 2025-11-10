@@ -1084,7 +1084,7 @@ if __name__ == '__main__':
         transform=test_transforms
     )
 
-    dict_users = cifar_user_dataset_dirichlet(dataset_train, num_users, noniid_fraction=noniid_fraction, alpha=0.1, balanced=False, seed=27)
+    dict_users = cifar_user_dataset_dirichlet(dataset_train, num_users, noniid_fraction=noniid_fraction, alpha=0.2, balanced=False, seed=27)
     dict_users_test = dataset_iid(dataset_test, num_users)
     draw_data_distribution(dict_users, dataset_train, num_users,
                            save_path='output/data_distribution.png')
